@@ -494,6 +494,7 @@ AP_GROUPEND
 
 static const ap_message STREAM_RAW_SENSORS_msgs[] = {
     MSG_RAW_IMU,
+    MSG_HIGHRES_IMU,
     MSG_SCALED_IMU2,
     MSG_SCALED_IMU3,
     MSG_SCALED_PRESSURE,
