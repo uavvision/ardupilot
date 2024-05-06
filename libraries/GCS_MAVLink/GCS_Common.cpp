@@ -2029,7 +2029,7 @@ void GCS_MAVLINK::send_scaled_imu(uint8_t instance, void (*send_fn)(mavlink_chan
 #endif
 }
 
-void GCS_MAVLINK::send_highres_imu()
+void GCS_MAVLINK::send_highres_imu(uint8_t instance)
 {
 #if AP_INERTIALSENSOR_ENABLED
     const AP_InertialSensor &ins = AP::ins();
@@ -5837,7 +5837,7 @@ bool GCS_MAVLINK::try_send_message(const enum ap_message id)
 
     case MSG_HIGHRES_IMU:
         CHECK_PAYLOAD_SIZE(HIGHRES_IMU);
-        send_highres_imu();
+        send_highres_imu(0);
         break;
 
     case MSG_SCALED_PRESSURE:
