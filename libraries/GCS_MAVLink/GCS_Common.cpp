@@ -1628,6 +1628,14 @@ void GCS_MAVLINK::send_message(enum ap_message id)
 void GCS_MAVLINK::packetReceived(const mavlink_status_t &status,
                                  const mavlink_message_t &msg)
 {
+    // NOTE: added to route STATUSTEXT messages
+    // TODO: think about a better way to handle this
+    if (msg.msgid == MAVLINK_MSG_ID_STATUSTEXT) {
+        mavlink_statustext_t packet;
+        mavlink_msg_statustext_decode(&msg, &packet);
+        gcs().send_text(MAV_SEVERITY_INFO, "%s", packet.text);
+    }
+
     // we exclude radio packets because we historically used this to
     // make it possible to use the CLI over the radio
     if (msg.msgid != MAVLINK_MSG_ID_RADIO && msg.msgid != MAVLINK_MSG_ID_RADIO_STATUS) {
