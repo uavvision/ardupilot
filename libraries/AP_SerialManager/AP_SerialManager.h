@@ -49,6 +49,9 @@
 #define SERIALMANAGER_MAX_PORTS 10
 #endif
 
+#ifndef AP_SERIALMANAGER_IMUOUT_ENABLED
+#define AP_SERIALMANAGER_IMUOUT_ENABLED (CONFIG_HAL_BOARD == HAL_BOARD_CHIBIOS)
+#endif
 
  // console default baud rates and buffer sizes
 #ifdef HAL_SERIAL0_BAUD_DEFAULT
@@ -115,6 +118,11 @@
 #define AP_SERIALMANAGER_MSP_BUFSIZE_TX     256
 #define AP_SERIALMANAGER_MSP_BAUD           115200
 
+// IMU OUT protocol
+#define AP_SERIALMANAGER_IMUOUT_BAUD           921600
+#define AP_SERIALMANAGER_IMUOUT_BUFSIZE_RX     128
+#define AP_SERIALMANAGER_IMUOUT_BUFSIZE_TX     2048
+
 class AP_SerialManager {
 public:
     AP_SerialManager();
@@ -170,6 +178,7 @@ public:
         SerialProtocol_MSP_DisplayPort = 42,
         SerialProtocol_MAVLinkHL = 43,
         SerialProtocol_Tramp = 44,
+        SerialProtocol_IMUOUT = 46,
         SerialProtocol_NumProtocols                    // must be the last value
     };
 
