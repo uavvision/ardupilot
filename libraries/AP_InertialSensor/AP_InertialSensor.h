@@ -319,6 +319,17 @@ public:
     // for killing an IMU for testing purposes
     void kill_imu(uint8_t imu_idx, bool kill_it);
 
+#if AP_SERIALMANAGER_IMUOUT_ENABLED
+    // optional UART for sending IMU data to an external process
+    void set_imu_out_uart(AP_HAL::UARTDriver *uart);
+    void send_uart_data(void);
+
+    struct {
+        uint16_t counter;
+        AP_HAL::UARTDriver *imu_out_uart;
+    } uart;
+#endif // AP_SERIALMANAGER_IMUOUT_ENABLED
+
     enum IMU_SENSOR_TYPE {
         IMU_SENSOR_TYPE_ACCEL = 0,
         IMU_SENSOR_TYPE_GYRO = 1,
