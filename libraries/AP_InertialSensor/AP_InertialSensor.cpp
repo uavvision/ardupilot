@@ -2500,10 +2500,8 @@ void AP_InertialSensor::send_uart_data(void)
         uint16_t magic = 0x29c4;
         uint16_t length;
         uint32_t timestamp_us;
-        Vector3f delta_velocity;
-        Vector3f delta_angle;
-        float    delta_velocity_dt;
-        float    delta_angle_dt;
+        Vector3f velocity;
+        Vector3f angle;
         uint16_t counter;
         uint16_t crc;
     } data;
@@ -2514,10 +2512,11 @@ void AP_InertialSensor::send_uart_data(void)
     }
 
     data.length = sizeof(data);
-    data.timestamp_us = AP_HAL::micros();
 
-    get_delta_angle(get_primary_gyro(), data.delta_angle, data.delta_angle_dt);
-    get_delta_velocity(get_primary_accel(), data.delta_velocity, data.delta_velocity_dt);
+    const Vector3f &accel = get_accel(0);
+    const Vector3f &gyro = get_gyro(0);
+    data.angle = gyro;
+    data.velocity = accel;
 
     data.counter = uart.counter++;
     data.crc = crc_xmodem((const uint8_t *)&data, sizeof(data)-sizeof(uint16_t));
