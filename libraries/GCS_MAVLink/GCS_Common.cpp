@@ -1631,7 +1631,7 @@ GCS_MAVLINK::update_receive(uint32_t max_time_us)
     if (uint16_t(now16_ms - try_send_message_stats.statustext_last_sent_ms) > 10000U) {
         if (try_send_message_stats.longest_time_us) {
             gcs().send_text(MAV_SEVERITY_INFO,
-                            "GCS.chan(%u): ap_msg=%u took %uus to send",
+                            "GCS.chan(%u): ap_msg=%u took %lu to send",
                             chan,
                             try_send_message_stats.longest_id,
                             try_send_message_stats.longest_time_us);
@@ -1640,14 +1640,14 @@ GCS_MAVLINK::update_receive(uint32_t max_time_us)
         if (try_send_message_stats.no_space_for_message &&
             (is_active() || is_streaming())) {
             gcs().send_text(MAV_SEVERITY_INFO,
-                            "GCS.chan(%u): out-of-space: %u",
+                            "GCS.chan(%u): out-of-space: %lu",
                             chan,
                             try_send_message_stats.no_space_for_message);
             try_send_message_stats.no_space_for_message = 0;
         }
         if (try_send_message_stats.out_of_time) {
             gcs().send_text(MAV_SEVERITY_INFO,
-                            "GCS.chan(%u): out-of-time=%u",
+                            "GCS.chan(%u): out-of-time=%lu",
                             chan,
                             try_send_message_stats.out_of_time);
             try_send_message_stats.out_of_time = 0;
@@ -1661,7 +1661,7 @@ GCS_MAVLINK::update_receive(uint32_t max_time_us)
         }
         if (try_send_message_stats.behind) {
             gcs().send_text(MAV_SEVERITY_INFO,
-                            "GCS.chan(%u): behind=%u",
+                            "GCS.chan(%u): behind=%lu",
                             chan,
                             try_send_message_stats.behind);
             try_send_message_stats.behind = 0;
@@ -1675,7 +1675,7 @@ GCS_MAVLINK::update_receive(uint32_t max_time_us)
         }
         if (try_send_message_stats.max_retry_deferred_body_us) {
             gcs().send_text(MAV_SEVERITY_INFO,
-                            "GCS.chan(%u): retry_body_maxtime=%uus (%u)",
+                            "GCS.chan(%u): retry_body_maxtime=%lu (%u)",
                             chan,
                             try_send_message_stats.max_retry_deferred_body_us,
                             try_send_message_stats.max_retry_deferred_body_type
