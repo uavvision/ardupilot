@@ -49,10 +49,10 @@ bool Plane::auto_takeoff_check(void)
     }  
 
     // Check for bad GPS
-    if (gps.status() < AP_GPS::GPS_OK_FIX_3D) {
-        // no auto takeoff without GPS lock
-        return false;
-    }
+    // if (gps.status() < AP_GPS::GPS_OK_FIX_3D) {
+    //     // no auto takeoff without GPS lock
+    //     return false;
+    // }
 
     bool do_takeoff_attitude_check = !(flight_option_enabled(FlightOptions::DISABLE_TOFF_ATTITUDE_CHK));
 #if HAL_QUADPLANE_ENABLED

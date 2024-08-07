@@ -95,7 +95,8 @@ bool Plane::suppress_throttle(void)
         return false;
     }
 
-    bool gps_movement = (gps.status() >= AP_GPS::GPS_OK_FIX_2D && gps.ground_speed() >= 5);
+//    bool gps_movement = (gps.status() >= AP_GPS::GPS_OK_FIX_2D && gps.ground_speed() >= 5);
+    bool gps_movement = true;
     
     if ((control_mode == &mode_auto &&
          auto_state.takeoff_complete == false) ||
