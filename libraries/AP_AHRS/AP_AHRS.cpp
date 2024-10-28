@@ -866,17 +866,20 @@ bool AP_AHRS::_should_use_airspeed_sensor(uint8_t airspeed_index) const
     if (!airspeed_sensor_enabled(airspeed_index)) {
         return false;
     }
-    nav_filter_status filter_status;
-    if (fly_forward &&
-        hal.util->get_soft_armed() &&
-        get_filter_status(filter_status) &&
-        (filter_status.flags.rejecting_airspeed && !filter_status.flags.dead_reckoning)) {
-        // special case for when backend is rejecting airspeed data in
-        // an armed fly_forward state and not dead reckoning. Then the
-        // airspeed data is highly suspect and will be rejected. We
-        // will use the synthetic airspeed instead
-        return false;
-    }
+    // REASON: when GPS with high noise, EKF estimate of airspeed is not reliable
+    // TODO: in v4.6 use `DontDisableAirspeedUsingEKF`
+    // https://ardupilot.org/plane/docs/parameters.html#ahrs-options-optional-ahrs-behaviour
+    // nav_filter_status filter_status;
+    // if (fly_forward &&
+    //     hal.util->get_soft_armed() &&
+    //     get_filter_status(filter_status) &&
+    //     (filter_status.flags.rejecting_airspeed && !filter_status.flags.dead_reckoning)) {
+    //     // special case for when backend is rejecting airspeed data in
+    //     // an armed fly_forward state and not dead reckoning. Then the
+    //     // airspeed data is highly suspect and will be rejected. We
+    //     // will use the synthetic airspeed instead
+    //     return false;
+    // }
     return true;
 }
 

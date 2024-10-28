@@ -1033,7 +1033,8 @@ void AP_Baro::update_field_elevation(void)
         _field_elevation_last_ms = now_ms;
         AP::ahrs().resetHeightDatum();
         update_calibration();
-        BARO_SEND_TEXT(MAV_SEVERITY_INFO, "Field Elevation Set: %.0fm", _field_elevation_active);
+        // REASON: spams GCS with messages
+        // BARO_SEND_TEXT(MAV_SEVERITY_INFO, "Field Elevation Set: %.0fm", _field_elevation_active);
     }
 }
 

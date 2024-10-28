@@ -188,7 +188,6 @@ bool MAVLink_routing::check_and_forward(GCS_MAVLINK &in_link, const mavlink_mess
                                   !match_system))) {
 
             if (&in_link != out_link && !sent_to_chan[routes[i].channel]) {
-            // if (!sent_to_chan[routes[i].channel]) {
 
                 if (out_link->check_payload_size(msg.len)) {
 #if ROUTING_DEBUG

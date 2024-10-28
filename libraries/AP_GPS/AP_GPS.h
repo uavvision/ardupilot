@@ -271,6 +271,10 @@ public:
         return primary_instance;
     }
 
+    bool disabled(void) const {
+        return _force_disable_gps;
+    }
+
     /// Query GPS status
     GPS_Status status(uint8_t instance) const {
         if (_force_disable_gps && state[instance].status > NO_FIX) {

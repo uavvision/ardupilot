@@ -151,14 +151,10 @@ void NavEKF3_core::ResetPosition(resetDataSource posResetSource)
 bool NavEKF3_core::setLatLng(const Location &loc, float posAccuracy, uint32_t timestamp_ms)
 {
     // Commented due to ability to call External Pose when dead-reckoning and GPS aiding is disabled
-    // if ((imuSampleTime_ms - lastPosPassTime_ms) < frontend->deadReckonDeclare_ms ||
-    //     (PV_AidingMode == AID_NONE)
-    //     || !validOrigin) {
-    //     return false;
-    // }
-
-     if ((imuSampleTime_ms - lastPosPassTime_ms) < frontend->deadReckonDeclare_ms ||
-        !validOrigin) {
+    if ((imuSampleTime_ms - lastPosPassTime_ms) < frontend->deadReckonDeclare_ms ||
+        (PV_AidingMode == AID_NONE)
+        || !validOrigin 
+        || AP::gps().disabled()) {
         return false;
     }
 

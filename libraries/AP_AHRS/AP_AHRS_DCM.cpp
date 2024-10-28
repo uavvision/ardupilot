@@ -456,6 +456,8 @@ bool AP_AHRS_DCM::use_compass(void)
     // degrees and the estimated wind speed is less than 80% of the
     // ground speed, then switch to GPS navigation. This will help
     // prevent flyaways with very bad compass offsets
+
+    // NOTE: Maybe we want to use compass only
     const float error = fabsf(wrap_180(degrees(yaw) - AP::gps().ground_course()));
     if (error > 45 && _wind.length() < AP::gps().ground_speed()*0.8f) {
         if (AP_HAL::millis() - _last_consistent_heading > 2000) {
@@ -523,6 +525,9 @@ AP_AHRS_DCM::drift_correction_yaw(void)
             // don't suddenly change yaw with a reset
             _gps_last_update = _gps.last_fix_time_ms();
         }
+
+    // NOTE: Only when `use_compass` returns false, but since we disabled 
+    // GPS usage there, we will always use compass
     } else if (AP::ahrs().get_fly_forward() && have_gps()) {
         /*
           we are using GPS for yaw
