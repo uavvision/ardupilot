@@ -28,7 +28,7 @@
 // This could be removed once the build system allows for APM_BUILD_TYPE in header files
 // Note that this is also defined in AP_Airspeed_Params.cpp
 #ifndef AP_AIRSPEED_DUMMY_METHODS_ENABLED
-#define AP_AIRSPEED_DUMMY_METHODS_ENABLED ((APM_BUILD_COPTER_OR_HELI && BOARD_FLASH_SIZE <= 1024) || \
+#define AP_AIRSPEED_DUMMY_METHODS_ENABLED ((APM_BUILD_COPTER_OR_HELI && HAL_PROGRAM_SIZE_LIMIT_KB <= 1024) || \
                                             APM_BUILD_TYPE(APM_BUILD_AntennaTracker) || APM_BUILD_TYPE(APM_BUILD_Blimp))
 #endif
 
@@ -52,6 +52,7 @@
 #include "AP_Airspeed_DroneCAN.h"
 #include "AP_Airspeed_NMEA.h"
 #include "AP_Airspeed_MSP.h"
+#include "AP_Airspeed_AUAV.h"
 #include "AP_Airspeed_External.h"
 #include "AP_Airspeed_SITL.h"
 extern const AP_HAL::HAL &hal;
@@ -125,9 +126,9 @@ const AP_Param::GroupInfo AP_Airspeed::var_info[] = {
 #ifndef HAL_BUILD_AP_PERIPH
     // @Param: _OPTIONS
     // @DisplayName: Airspeed options bitmask
-    // @Description: Bitmask of options to use with airspeed. 0:Disable use based on airspeed/groundspeed mismatch (see ARSPD_WIND_MAX), 1:Automatically reenable use based on airspeed/groundspeed mismatch recovery (see ARSPD_WIND_MAX) 2:Disable voltage correction, 3:Check that the airspeed is statistically consistent with the navigation EKF vehicle and wind velocity estimates using EKF3 (requires AHRS_EKF_TYPE = 3)
+    // @Description: Bitmask of options to use with airspeed. 0:Disable use based on airspeed/groundspeed mismatch (see ARSPD_WIND_MAX), 1:Automatically reenable use based on airspeed/groundspeed mismatch recovery (see ARSPD_WIND_MAX) 2:Disable voltage correction, 3:Check that the airspeed is statistically consistent with the navigation EKF vehicle and wind velocity estimates using EKF3 (requires AHRS_EKF_TYPE = 3), 4:Report cal offset to GCS
     // @Description{Copter, Blimp, Rover, Sub}: This parameter and function is not used by this vehicle. Always set to 0.
-    // @Bitmask: 0:SpeedMismatchDisable, 1:AllowSpeedMismatchRecovery, 2:DisableVoltageCorrection, 3:UseEkf3Consistency
+    // @Bitmask: 0:SpeedMismatchDisable, 1:AllowSpeedMismatchRecovery, 2:DisableVoltageCorrection, 3:UseEkf3Consistency, 4:ReportOffset
     // @User: Advanced
     AP_GROUPINFO("_OPTIONS", 21, AP_Airspeed, _options, OPTIONS_DEFAULT),
 
@@ -157,7 +158,7 @@ const AP_Param::GroupInfo AP_Airspeed::var_info[] = {
     
     // @Param: _OFF_PCNT
     // @DisplayName: Maximum offset cal speed error 
-    // @Description: The maximum percentage speed change in airspeed reports that is allowed due to offset changes between calibrations before a warning is issued. This potential speed error is in percent of ASPD_FBW_MIN. 0 disables. Helps warn of calibrations without pitot being covered.
+    // @Description: The maximum percentage speed change in airspeed reports that is allowed due to offset changes between calibrations before a warning is issued. This potential speed error is in percent of AIRSPEED_MIN. 0 disables. Helps warn of calibrations without pitot being covered.
     // @Range: 0.0 10.0
     // @Units: %
     // @User: Advanced
@@ -210,7 +211,7 @@ void AP_Airspeed::set_fixedwing_parameters(const AP_FixedWing *_fixed_wing_param
 }
 
 // macro for use by HAL_INS_PROBE_LIST
-#define GET_I2C_DEVICE(bus, address) hal.i2c_mgr->get_device(bus, address)
+#define GET_I2C_DEVICE(bus, address) hal.i2c_mgr->get_device_ptr(bus, address)
 
 bool AP_Airspeed::add_backend(AP_Airspeed_Backend *backend)
 {
@@ -240,7 +241,7 @@ bool AP_Airspeed::add_backend(AP_Airspeed_Backend *backend)
     } while (0)
 
 
-// convet params to per instance param table
+// convert params to per instance param table
 // PARAMETER_CONVERSION - Added: Dec-2022
 void AP_Airspeed::convert_per_instance()
 {
@@ -356,67 +357,67 @@ void AP_Airspeed::allocate()
             break;
         case TYPE_I2C_MS4525:
 #if AP_AIRSPEED_MS4525_ENABLED
-            sensor[i] = new AP_Airspeed_MS4525(*this, i);
+            sensor[i] = NEW_NOTHROW AP_Airspeed_MS4525(*this, i);
 #endif
             break;
         case TYPE_SITL:
 #if AP_AIRSPEED_SITL_ENABLED
-            sensor[i] = new AP_Airspeed_SITL(*this, i);
+            sensor[i] = NEW_NOTHROW AP_Airspeed_SITL(*this, i);
 #endif
             break;
         case TYPE_ANALOG:
 #if AP_AIRSPEED_ANALOG_ENABLED
-            sensor[i] = new AP_Airspeed_Analog(*this, i);
+            sensor[i] = NEW_NOTHROW AP_Airspeed_Analog(*this, i);
 #endif
             break;
         case TYPE_I2C_MS5525:
 #if AP_AIRSPEED_MS5525_ENABLED
-            sensor[i] = new AP_Airspeed_MS5525(*this, i, AP_Airspeed_MS5525::MS5525_ADDR_AUTO);
+            sensor[i] = NEW_NOTHROW AP_Airspeed_MS5525(*this, i, AP_Airspeed_MS5525::MS5525_ADDR_AUTO);
 #endif
             break;
         case TYPE_I2C_MS5525_ADDRESS_1:
 #if AP_AIRSPEED_MS5525_ENABLED
-            sensor[i] = new AP_Airspeed_MS5525(*this, i, AP_Airspeed_MS5525::MS5525_ADDR_1);
+            sensor[i] = NEW_NOTHROW AP_Airspeed_MS5525(*this, i, AP_Airspeed_MS5525::MS5525_ADDR_1);
 #endif
             break;
         case TYPE_I2C_MS5525_ADDRESS_2:
 #if AP_AIRSPEED_MS5525_ENABLED
-            sensor[i] = new AP_Airspeed_MS5525(*this, i, AP_Airspeed_MS5525::MS5525_ADDR_2);
+            sensor[i] = NEW_NOTHROW AP_Airspeed_MS5525(*this, i, AP_Airspeed_MS5525::MS5525_ADDR_2);
 #endif
             break;
         case TYPE_I2C_SDP3X:
 #if AP_AIRSPEED_SDP3X_ENABLED
-            sensor[i] = new AP_Airspeed_SDP3X(*this, i);
+            sensor[i] = NEW_NOTHROW AP_Airspeed_SDP3X(*this, i);
 #endif
             break;
         case TYPE_I2C_DLVR_5IN:
 #if AP_AIRSPEED_DLVR_ENABLED
-            sensor[i] = new AP_Airspeed_DLVR(*this, i, 5);
+            sensor[i] = NEW_NOTHROW AP_Airspeed_DLVR(*this, i, 5);
 #endif
             break;
         case TYPE_I2C_DLVR_10IN:
 #if AP_AIRSPEED_DLVR_ENABLED
-            sensor[i] = new AP_Airspeed_DLVR(*this, i, 10);
+            sensor[i] = NEW_NOTHROW AP_Airspeed_DLVR(*this, i, 10);
 #endif
             break;
         case TYPE_I2C_DLVR_20IN:
 #if AP_AIRSPEED_DLVR_ENABLED
-            sensor[i] = new AP_Airspeed_DLVR(*this, i, 20);
+            sensor[i] = NEW_NOTHROW AP_Airspeed_DLVR(*this, i, 20);
 #endif
             break;
         case TYPE_I2C_DLVR_30IN:
 #if AP_AIRSPEED_DLVR_ENABLED
-            sensor[i] = new AP_Airspeed_DLVR(*this, i, 30);
+            sensor[i] = NEW_NOTHROW AP_Airspeed_DLVR(*this, i, 30);
 #endif
             break;
         case TYPE_I2C_DLVR_60IN:
 #if AP_AIRSPEED_DLVR_ENABLED
-            sensor[i] = new AP_Airspeed_DLVR(*this, i, 60);
+            sensor[i] = NEW_NOTHROW AP_Airspeed_DLVR(*this, i, 60);
 #endif  // AP_AIRSPEED_DLVR_ENABLED
             break;
         case TYPE_I2C_ASP5033:
 #if AP_AIRSPEED_ASP5033_ENABLED
-            sensor[i] = new AP_Airspeed_ASP5033(*this, i);
+            sensor[i] = NEW_NOTHROW AP_Airspeed_ASP5033(*this, i);
 #endif
             break;
         case TYPE_UAVCAN:
@@ -427,18 +428,33 @@ void AP_Airspeed::allocate()
         case TYPE_NMEA_WATER:
 #if AP_AIRSPEED_NMEA_ENABLED
 #if APM_BUILD_TYPE(APM_BUILD_Rover) || APM_BUILD_TYPE(APM_BUILD_ArduSub) 
-            sensor[i] = new AP_Airspeed_NMEA(*this, i);
+            sensor[i] = NEW_NOTHROW AP_Airspeed_NMEA(*this, i);
 #endif
 #endif
             break;
         case TYPE_MSP:
 #if AP_AIRSPEED_MSP_ENABLED
-            sensor[i] = new AP_Airspeed_MSP(*this, i, 0);
+            sensor[i] = NEW_NOTHROW AP_Airspeed_MSP(*this, i, 0);
 #endif
             break;
         case TYPE_EXTERNAL:
 #if AP_AIRSPEED_EXTERNAL_ENABLED
-            sensor[i] = new AP_Airspeed_External(*this, i);
+            sensor[i] = NEW_NOTHROW AP_Airspeed_External(*this, i);
+#endif
+            break;
+        case TYPE_AUAV_5IN:
+#if AP_AIRSPEED_AUAV_ENABLED
+            sensor[i] = NEW_NOTHROW AP_Airspeed_AUAV(*this, i, 5);
+#endif
+            break;
+        case TYPE_AUAV_10IN:
+#if AP_AIRSPEED_AUAV_ENABLED
+            sensor[i] = NEW_NOTHROW AP_Airspeed_AUAV(*this, i, 10);
+#endif
+            break;
+        case TYPE_AUAV_30IN:
+#if AP_AIRSPEED_AUAV_ENABLED
+            sensor[i] = NEW_NOTHROW AP_Airspeed_AUAV(*this, i, 30);
 #endif
             break;
         }
@@ -477,19 +493,6 @@ void AP_Airspeed::allocate()
     }
 }
 
-// read the airspeed sensor
-float AP_Airspeed::get_pressure(uint8_t i)
-{
-    if (!enabled(i)) {
-        return 0;
-    }
-    float pressure = 0;
-    if (sensor[i]) {
-        state[i].healthy = sensor[i]->get_differential_pressure(pressure);
-    }
-    return pressure;
-}
-
 // get a temperature reading if possible
 bool AP_Airspeed::get_temperature(uint8_t i, float &temperature)
 {
@@ -526,14 +529,14 @@ void AP_Airspeed::calibrate(bool in_startup)
             continue;
         }
         if (sensor[i] == nullptr) {
-            GCS_SEND_TEXT(MAV_SEVERITY_ERROR, "Airspeed %u not initalized, cannot cal", i+1);
+            GCS_SEND_TEXT(MAV_SEVERITY_ERROR, "Airspeed %u not initialized, cannot cal", i+1);
             continue;
         }
         state[i].cal.start_ms = AP_HAL::millis();
         state[i].cal.count = 0;
         state[i].cal.sum = 0;
         state[i].cal.read_count = 0;
-        calibration_state[i] = CalibrationState::IN_PROGRESS;
+        state[i].cal.state = CalibrationState::IN_PROGRESS;
         GCS_SEND_TEXT(MAV_SEVERITY_INFO,"Airspeed %u calibration started", i+1);
     }
 #endif // HAL_BUILD_AP_PERIPH
@@ -555,9 +558,8 @@ void AP_Airspeed::update_calibration(uint8_t i, float raw_pressure)
         state[i].cal.read_count > 15) {
         if (state[i].cal.count == 0) {
             GCS_SEND_TEXT(MAV_SEVERITY_WARNING, "Airspeed %u unhealthy", i + 1);
-            calibration_state[i] = CalibrationState::FAILED;
+            state[i].cal.state = CalibrationState::FAILED;
         } else {
-            GCS_SEND_TEXT(MAV_SEVERITY_INFO, "Airspeed %u calibrated", i + 1);
             float calibrated_offset = state[i].cal.sum / state[i].cal.count;
             // check if new offset differs too greatly from last calibration, indicating pitot uncovered in wind
             if (fixed_wing_parameters != nullptr) {
@@ -569,7 +571,12 @@ void AP_Airspeed::update_calibration(uint8_t i, float raw_pressure)
                 }
             }
             param[i].offset.set_and_save(calibrated_offset);
-            calibration_state[i] = CalibrationState::SUCCESS;
+            state[i].cal.state = CalibrationState::SUCCESS;
+            if (_options & AP_Airspeed::OptionsMask::REPORT_OFFSET ){
+                 GCS_SEND_TEXT(MAV_SEVERITY_INFO, "Airspeed %u calibrated, offset = %4.0f", i + 1, calibrated_offset);
+            } else {
+                 GCS_SEND_TEXT(MAV_SEVERITY_INFO, "Airspeed %u calibrated", i + 1);
+            }
         }
         state[i].cal.start_ms = 0;
         return;
@@ -587,7 +594,7 @@ void AP_Airspeed::update_calibration(uint8_t i, float raw_pressure)
 AP_Airspeed::CalibrationState AP_Airspeed::get_calibration_state() const
 {
     for (uint8_t i=0; i<AIRSPEED_MAX_SENSORS; i++) {
-        switch (calibration_state[i]) {
+        switch (state[i].cal.state) {
         case CalibrationState::SUCCESS:
         case CalibrationState::NOT_STARTED:
             continue;
@@ -617,13 +624,14 @@ void AP_Airspeed::read(uint8_t i)
 
 #ifndef HAL_BUILD_AP_PERIPH
     /*
-      get the healthy state before we call get_pressure() as
-      get_pressure() overwrites the healthy state
+      remember the old healthy state
      */
     bool prev_healthy = state[i].healthy;
 #endif
 
-    float raw_pressure = get_pressure(i);
+    float raw_pressure = 0;
+    state[i].healthy = sensor[i]->get_differential_pressure(raw_pressure);
+
     float airspeed_pressure = raw_pressure - get_offset(i);
 
     // remember raw pressure for logging
@@ -872,7 +880,10 @@ bool AP_Airspeed::enabled(uint8_t i) const {
 
 // return health status of sensor
 bool AP_Airspeed::healthy(uint8_t i) const {
-    bool ok = state[i].healthy && enabled(i) && sensor[i] != nullptr;
+    if (!enabled(i)) {
+        return false;
+    }
+    bool ok = state[i].healthy && sensor[i] != nullptr;
 #ifndef HAL_BUILD_AP_PERIPH
     // sanity check the offset parameter.  Zero is permitted if we are skipping calibration.
     ok &= (fabsf(param[i].offset) > 0 || state[i].use_zero_offset || param[i].skip_cal);

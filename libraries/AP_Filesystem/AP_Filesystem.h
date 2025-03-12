@@ -38,6 +38,9 @@
 #if AP_FILESYSTEM_FATFS_ENABLED
 #include "AP_Filesystem_FATFS.h"
 #endif
+#if AP_FILESYSTEM_LITTLEFS_ENABLED
+#include "AP_Filesystem_FlashMemory_LittleFS.h"
+#endif
 
 struct dirent {
    char    d_name[MAX_NAME_LEN]; /* filename */
@@ -54,8 +57,11 @@ struct dirent {
 #define AP_FILESYSTEM_FORMAT_ENABLED 1
 #endif
 
-#if CONFIG_HAL_BOARD == HAL_BOARD_LINUX || CONFIG_HAL_BOARD == HAL_BOARD_SITL
+#if CONFIG_HAL_BOARD == HAL_BOARD_LINUX || CONFIG_HAL_BOARD == HAL_BOARD_SITL || CONFIG_HAL_BOARD == HAL_BOARD_QURT
 #include "AP_Filesystem_posix.h"
+#if AP_FILESYSTEM_LITTLEFS_ENABLED
+#include "AP_Filesystem_FlashMemory_LittleFS.h"
+#endif
 #endif
 
 #if CONFIG_HAL_BOARD == HAL_BOARD_ESP32
@@ -104,6 +110,10 @@ public:
     struct dirent *readdir(DirHandle *dirp);
     int closedir(DirHandle *dirp);
 
+    // return number of bytes that should be written before fsync for optimal
+    // streaming performance/robustness. if zero, any number can be written.
+    uint32_t bytes_until_fsync(int fd);
+
     // return free disk space in bytes, -1 on error
     int64_t disk_free(const char *path);
 
@@ -132,7 +142,9 @@ public:
     AP_Filesystem_Backend::FormatStatus get_format_status() const;
 
     /*
-      load a full file. Use delete to free the data
+      Load a file's contents into memory. Returned object must be `delete`d to
+      free the data. The data is guaranteed to be null-terminated such that it
+      can be treated as a string.
      */
     FileData *load_file(const char *filename);
 

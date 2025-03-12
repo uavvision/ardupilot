@@ -3,6 +3,7 @@
 #if AP_VEHICLE_ENABLED
 
 #include "AP_Vehicle.h"
+#include <AP_InertialSensor/AP_InertialSensor_rate_config.h>
 
 #include <AP_BLHeli/AP_BLHeli.h>
 #include <AP_Common/AP_FWVersion.h>
@@ -34,11 +35,8 @@ extern AP_IOMCU iomcu;
   2nd group of parameters
  */
 const AP_Param::GroupInfo AP_Vehicle::var_info[] = {
-#if HAL_RUNCAM_ENABLED
-    // @Group: CAM_RC_
-    // @Path: ../AP_Camera/AP_RunCam.cpp
-    AP_SUBGROUPINFO(runcam, "CAM_RC_", 1, AP_Vehicle, AP_RunCam),
-#endif
+
+    // 1: RunCam
 
 #if HAL_GYROFFT_ENABLED
     // @Group: FFT_
@@ -223,6 +221,7 @@ const AP_Param::GroupInfo AP_Vehicle::var_info[] = {
       are too deep in the parameter tree
      */
 
+#if AP_NETWORKING_REGISTER_PORT_ENABLED
 #if AP_NETWORKING_NUM_PORTS > 0
     // @Group: NET_P1_
     // @Path: ../AP_Networking/AP_Networking_port.cpp
@@ -246,6 +245,7 @@ const AP_Param::GroupInfo AP_Vehicle::var_info[] = {
     // @Path: ../AP_Networking/AP_Networking_port.cpp
     AP_SUBGROUPINFO(networking.ports[3], "NET_P4_", 25, AP_Vehicle, AP_Networking::Port),
 #endif
+#endif  // AP_NETWORKING_REGISTER_PORT_ENABLED
 #endif // AP_NETWORKING_ENABLED
 
 #if AP_FILTER_ENABLED
@@ -356,6 +356,11 @@ void AP_Vehicle::setup()
 #endif
 
 #if AP_SERIALMANAGER_ENABLED
+#if HAL_WITH_IO_MCU
+    if (BoardConfig.io_enabled()) {
+        serial_manager.set_protocol_and_baud(HAL_UART_IOMCU_IDX, AP_SerialManager::SerialProtocol_IOMCU, 0);
+    }
+#endif
     // initialise serial ports
     serial_manager.init();
 #endif
@@ -367,9 +372,19 @@ void AP_Vehicle::setup()
     networking.init();
 #endif
 
+#if AP_SCRIPTING_ENABLED
+#if AP_SCRIPTING_SERIALDEVICE_ENABLED
+    // must be done now so ports are registered and drivers get set up properly
+    // (in particular mavlink which checks during init_ardupilot())
+    scripting.init_serialdevice_ports();
+#endif
+#endif
+
+#if AP_SCHEDULER_ENABLED
     // Register scheduler_delay_cb, which will run anytime you have
     // more than 5ms remaining in your call to hal.scheduler->delay
     hal.scheduler->register_delay_callback(scheduler_delay_callback, 5);
+#endif
 
 #if HAL_MSP_ENABLED
     // call MSP init before init_ardupilot to allow for MSP sensors
@@ -426,15 +441,16 @@ void AP_Vehicle::setup()
 
 
 #if AP_SRV_CHANNELS_ENABLED
-    SRV_Channels::init();
+    AP::srv().init();
 #endif
 
     // gyro FFT needs to be initialized really late
 #if HAL_GYROFFT_ENABLED
+#if AP_SCHEDULER_ENABLED
     gyro_fft.init(AP::scheduler().get_loop_rate_hz());
+#else
+    gyro_fft.init(1000);
 #endif
-#if HAL_RUNCAM_ENABLED
-    runcam.init();
 #endif
 #if HAL_HOTT_TELEM_ENABLED
     hott_telem.init();
@@ -516,12 +532,21 @@ void AP_Vehicle::setup()
         GCS_SEND_TEXT(MAV_SEVERITY_ERROR, "%s Failed to Initialize", AP_DDS_Client::msg_prefix);
     }
 #endif
+
+#if AP_IBUS_TELEM_ENABLED
+    ibus_telem.init();
+#endif
 }
 
 void AP_Vehicle::loop()
 {
+#if AP_SCHEDULER_ENABLED
     scheduler.loop();
     G_Dt = scheduler.get_loop_period_s();
+#else
+    hal.scheduler->delay(1);
+    G_Dt = 0.001;
+#endif
 
     if (!done_safety_init) {
         /*
@@ -548,6 +573,7 @@ void AP_Vehicle::loop()
     }
 }
 
+#if AP_SCHEDULER_ENABLED
 /*
   scheduler table - all regular tasks apart from the fast_loop()
   should be listed here.
@@ -588,14 +614,13 @@ const AP_Scheduler::Task AP_Vehicle::scheduler_tasks[] = {
 #if HAL_NMEA_OUTPUT_ENABLED
     SCHED_TASK_CLASS(AP_NMEA_Output, &vehicle.nmea,         update,                   50, 50, 180),
 #endif
-#if HAL_RUNCAM_ENABLED
-    SCHED_TASK_CLASS(AP_RunCam,    &vehicle.runcam,         update,                   50, 50, 200),
-#endif
 #if HAL_GYROFFT_ENABLED
     SCHED_TASK_CLASS(AP_GyroFFT,   &vehicle.gyro_fft,       update,                  400, 50, 205),
     SCHED_TASK_CLASS(AP_GyroFFT,   &vehicle.gyro_fft,       update_parameters,         1, 50, 210),
 #endif
+#if AP_INERTIALSENSOR_HARMONICNOTCH_ENABLED && !AP_INERTIALSENSOR_FAST_SAMPLE_WINDOW_ENABLED
     SCHED_TASK(update_dynamic_notch_at_specified_rate,      LOOP_RATE,                    200, 215),
+#endif
 #if AP_VIDEOTX_ENABLED
     SCHED_TASK_CLASS(AP_VideoTX,   &vehicle.vtx,            update,                    2, 100, 220),
 #endif
@@ -604,7 +629,12 @@ const AP_Scheduler::Task AP_Vehicle::scheduler_tasks[] = {
 #endif
     SCHED_TASK(send_watchdog_reset_statustext,         0.1,     20, 225),
 #if HAL_WITH_ESC_TELEM
+    // This update function is responsible for checking timeouts and invalidating the ESC telemetry data.
+    // Be mindful of this if you are planning to reduce the frequency from 100Hz.
     SCHED_TASK_CLASS(AP_ESC_Telem, &vehicle.esc_telem,      update,                  100,  50, 230),
+#endif
+#if AP_SERVO_TELEM_ENABLED
+    SCHED_TASK_CLASS(AP_Servo_Telem, &vehicle.servo_telem,  update,                   50,  50, 231),
 #endif
 #if HAL_GENERATOR_ENABLED
     SCHED_TASK_CLASS(AP_Generator, &vehicle.generator,      update,                   10,  50, 235),
@@ -706,6 +736,7 @@ void AP_Vehicle::scheduler_delay_callback()
     logger.EnableWrites(true);
 #endif
 }
+#endif  // AP_SCHEDULER_ENABLED
 
 // if there's been a watchdog reset, notify the world via a statustext:
 void AP_Vehicle::send_watchdog_reset_statustext()
@@ -745,24 +776,47 @@ bool AP_Vehicle::is_crashed() const
 #endif
 }
 
+#if AP_INERTIALSENSOR_HARMONICNOTCH_ENABLED
 // update the harmonic notch filter for throttle based notch
 void AP_Vehicle::update_throttle_notch(AP_InertialSensor::HarmonicNotch &notch)
 {
-#if APM_BUILD_TYPE(APM_BUILD_ArduPlane)||APM_BUILD_COPTER_OR_HELI||APM_BUILD_TYPE(APM_BUILD_Rover)
+#if APM_BUILD_TYPE(APM_BUILD_ArduPlane) || APM_BUILD_COPTER_OR_HELI || APM_BUILD_TYPE(APM_BUILD_Rover)
     const float ref_freq = notch.params.center_freq_hz();
     const float ref = notch.params.reference();
 
-#if APM_BUILD_TYPE(APM_BUILD_ArduPlane)||APM_BUILD_COPTER_OR_HELI
+#if APM_BUILD_TYPE(APM_BUILD_ArduPlane) || APM_BUILD_COPTER_OR_HELI
     const AP_Motors* motors = AP::motors();
-    const float motors_throttle = motors != nullptr ? MAX(0,motors->get_throttle_out()) : 0;
+    if (motors == nullptr) {
+         notch.update_freq_hz(0);
+         return;
+    }
+    const float motors_throttle = MAX(0,motors->get_throttle_out());
+    // set the harmonic notch filter frequency scaled on measured frequency
+    if (notch.params.hasOption(HarmonicNotchFilterParams::Options::DynamicHarmonic)) {
+        float notches[INS_MAX_NOTCHES];
+        uint8_t motor_num = 0;
+        for (uint8_t i = 0; i < AP_MOTORS_MAX_NUM_MOTORS; i++) {
+            float motor_throttle = 0;
+            if (motors->get_thrust(i, motor_throttle)) {
+                notches[motor_num] = ref_freq * sqrtf(MAX(0, motor_throttle) / ref);
+                motor_num++;
+            }
+            if (motor_num >= INS_MAX_NOTCHES) {
+                break;
+            }
+        }
+        notch.update_frequencies_hz(motor_num, notches);
+    } else
 #else  // APM_BUILD_Rover
     const AP_MotorsUGV *motors = AP::motors_ugv();
-    const float motors_throttle = motors != nullptr ? abs(motors->get_throttle() / 100.0f) : 0;
+    const float motors_throttle = motors != nullptr ? abs(motors->get_throttle() * 0.01f) : 0;
 #endif
+    {
+        float throttle_freq = ref_freq * sqrtf(MAX(0,motors_throttle) / ref);
 
-    float throttle_freq = ref_freq * sqrtf(MAX(0,motors_throttle) / ref);
+        notch.update_freq_hz(throttle_freq);
+    }
 
-    notch.update_freq_hz(throttle_freq);
 #endif
 }
 
@@ -862,6 +916,7 @@ void AP_Vehicle::update_dynamic_notch_at_specified_rate()
         }
     }
 }
+#endif  // AP_INERTIALSENSOR_HARMONICNOTCH_ENABLED
 
 void AP_Vehicle::notify_no_such_mode(uint8_t mode_number)
 {
@@ -1001,7 +1056,7 @@ void AP_Vehicle::one_Hz_update(void)
       every 10s check if using a 2M firmware on a 1M board
      */
     if (one_Hz_counter % 10U == 0) {
-#if defined(BOARD_CHECK_F427_USE_1M) && (BOARD_FLASH_SIZE>1024)
+#if defined(BOARD_CHECK_F427_USE_1M) && (HAL_PROGRAM_SIZE_LIMIT_KB>1024)
         if (!hal.util->get_soft_armed() && check_limit_flash_1M()) {
             GCS_SEND_TEXT(MAV_SEVERITY_CRITICAL, BOARD_CHECK_F427_USE_1M);
         }
@@ -1012,7 +1067,7 @@ void AP_Vehicle::one_Hz_update(void)
       every 30s check if using a 1M firmware on a 2M board
      */
     if (one_Hz_counter % 30U == 0) {
-#if defined(BOARD_CHECK_F427_USE_1M) && (BOARD_FLASH_SIZE<=1024)
+#if defined(BOARD_CHECK_F427_USE_1M) && (HAL_PROGRAM_SIZE_LIMIT_KB<=1024)
         if (!hal.util->get_soft_armed() && !check_limit_flash_1M()) {
             GCS_SEND_TEXT(MAV_SEVERITY_INFO, BOARD_CHECK_F427_USE_2M);
         }
@@ -1023,14 +1078,27 @@ void AP_Vehicle::one_Hz_update(void)
     scripting.update();
 #endif
 
+#if HAL_LOGGING_ENABLED && HAL_UART_STATS_ENABLED
+    // Log data rates of physical and virtual serial ports
+    hal.util->uart_log();
+#if AP_SERIALMANAGER_REGISTER_ENABLED
+    serial_manager.registered_ports_log();
+#endif
+#endif
+
 }
 
 void AP_Vehicle::check_motor_noise()
 {
 #if HAL_GYROFFT_ENABLED && HAL_WITH_ESC_TELEM
-    if (!hal.util->get_soft_armed() || !gyro_fft.check_esc_noise() || !gyro_fft.using_post_filter_samples() || ins.has_fft_notch()) {
+    if (!hal.util->get_soft_armed() || !gyro_fft.check_esc_noise() || !gyro_fft.using_post_filter_samples()) {
         return;
     }
+#if AP_INERTIALSENSOR_HARMONICNOTCH_ENABLED
+    if (ins.has_fft_notch()) {
+        return;
+    }
+#endif
 
     float esc_data[ESC_TELEM_MAX_ESCS];
     const uint8_t numf = AP::esc_telem().get_motor_frequencies_hz(ESC_TELEM_MAX_ESCS, esc_data);
@@ -1057,7 +1125,7 @@ void AP_Vehicle::check_motor_noise()
 #if AP_DDS_ENABLED
 bool AP_Vehicle::init_dds_client()
 {
-    dds_client = new AP_DDS_Client();
+    dds_client = NEW_NOTHROW AP_DDS_Client();
     if (dds_client == nullptr) {
         return false;
     }

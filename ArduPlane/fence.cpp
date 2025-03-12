@@ -8,9 +8,32 @@
 void Plane::fence_check()
 {
     const uint8_t orig_breaches = fence.get_breaches();
+    const bool armed = arming.is_armed();
+
+    uint16_t mission_id = plane.mission.get_current_nav_cmd().id;
+    bool landing_or_landed = plane.flight_stage == AP_FixedWing::FlightStage::LAND
+                         || !armed
+#if HAL_QUADPLANE_ENABLED
+                         || control_mode->mode_number() == Mode::Number::QLAND
+                         || quadplane.in_vtol_land_descent()
+#endif
+                         || (plane.is_land_command(mission_id) && plane.mission.state() == AP_Mission::MISSION_RUNNING);
 
     // check for new breaches; new_breaches is bitmask of fence types breached
-    const uint8_t new_breaches = fence.check();
+    const uint8_t new_breaches = fence.check(landing_or_landed);
+
+    /*
+      if we are either disarmed or we are currently not in breach and
+      we are not flying then clear the state associated with the
+      previous mode breach handling. This allows the fence state
+      machine to reset at the end of a fence breach action such as an
+      RTL and autoland
+     */
+    if (plane.previous_mode_reason == ModeReason::FENCE_BREACHED) {
+        if (!armed || ((new_breaches == 0 && orig_breaches == 0) && !plane.is_flying())) {
+            plane.previous_mode_reason = ModeReason::UNKNOWN;
+        }
+    }
 
     if (!fence.enabled()) {
         // Switch back to the chosen control mode if still in
@@ -19,6 +42,7 @@ void Plane::fence_check()
             case AC_FENCE_ACTION_GUIDED:
             case AC_FENCE_ACTION_GUIDED_THROTTLE_PASS:
             case AC_FENCE_ACTION_RTL_AND_LAND:
+            case AC_FENCE_ACTION_AUTOLAND_OR_RTL:
                 if (plane.control_mode_reason == ModeReason::FENCE_BREACHED &&
                     control_mode->is_guided_mode()) {
                     set_mode(*previous_mode, ModeReason::FENCE_RETURN_PREVIOUS_MODE);
@@ -34,7 +58,7 @@ void Plane::fence_check()
     // we still don't do anything when disarmed, but we do check for fence breaches.
     // fence pre-arm check actually checks if any fence has been breached
     // that's not ever going to be true if we don't call check on AP_Fence while disarmed
-    if (!arming.is_armed()) {
+    if (!armed) {
         return;
     }
 
@@ -50,31 +74,41 @@ void Plane::fence_check()
     }
 
     if (new_breaches) {
-        GCS_SEND_TEXT(MAV_SEVERITY_NOTICE, "Fence Breached");
+        fence.print_fence_message("breached", new_breaches);
 
         // if the user wants some kind of response and motors are armed
         const uint8_t fence_act = fence.get_action();
         switch (fence_act) {
         case AC_FENCE_ACTION_REPORT_ONLY:
             break;
+
+        case AC_FENCE_ACTION_AUTOLAND_OR_RTL:
+        case AC_FENCE_ACTION_RTL_AND_LAND:
+            if (control_mode == &mode_auto &&
+                mission.get_in_landing_sequence_flag() &&
+                (g.rtl_autoland == RtlAutoland::RTL_THEN_DO_LAND_START ||
+                    g.rtl_autoland == RtlAutoland::RTL_IMMEDIATE_DO_LAND_START)) {
+                // already landing
+                return;
+            }
+#if MODE_AUTOLAND_ENABLED
+            if (control_mode == &mode_autoland) {
+                // Already landing
+                return;
+            }
+            if ((fence_act == AC_FENCE_ACTION_AUTOLAND_OR_RTL) && set_mode(mode_autoland, ModeReason::FENCE_BREACHED)) {
+                break;
+            }
+#endif
+            set_mode(mode_rtl, ModeReason::FENCE_BREACHED);
+            break;
+
         case AC_FENCE_ACTION_GUIDED:
         case AC_FENCE_ACTION_GUIDED_THROTTLE_PASS:
-        case AC_FENCE_ACTION_RTL_AND_LAND:
-            if (fence_act == AC_FENCE_ACTION_RTL_AND_LAND) {
-                if (control_mode == &mode_auto &&
-                    mission.get_in_landing_sequence_flag() &&
-                    (g.rtl_autoland == RtlAutoland::RTL_THEN_DO_LAND_START ||
-                     g.rtl_autoland == RtlAutoland::RTL_IMMEDIATE_DO_LAND_START)) {
-                    // already landing
-                    return;
-                }
-                set_mode(mode_rtl, ModeReason::FENCE_BREACHED);
-            } else {
-                set_mode(mode_guided, ModeReason::FENCE_BREACHED);
-            }
+            set_mode(mode_guided, ModeReason::FENCE_BREACHED);
 
             Location loc;
-            if (fence.get_return_rally() != 0 || fence_act == AC_FENCE_ACTION_RTL_AND_LAND) {
+            if (fence.get_return_rally() != 0) {
                 loc = calc_best_rally_or_home_location(current_loc, get_RTL_altitude_cm());
             } else {
                 //return to fence return point, not a rally point
@@ -103,10 +137,8 @@ void Plane::fence_check()
                 }
             }
 
-            if (fence.get_action() != AC_FENCE_ACTION_RTL_AND_LAND) {
-                setup_terrain_target_alt(loc);
-                set_guided_WP(loc);
-            }
+            setup_terrain_target_alt(loc);
+            set_guided_WP(loc);
 
             if (fence.get_action() == AC_FENCE_ACTION_GUIDED_THROTTLE_PASS) {
                 guided_throttle_passthru = true;
@@ -115,7 +147,8 @@ void Plane::fence_check()
         }
 
         LOGGER_WRITE_ERROR(LogErrorSubsystem::FAILSAFE_FENCE, LogErrorCode(new_breaches));
-    } else if (orig_breaches) {
+    } else if (orig_breaches && fence.get_breaches() == 0) {
+        GCS_SEND_TEXT(MAV_SEVERITY_NOTICE, "Fence breach cleared");
         // record clearing of breach
         LOGGER_WRITE_ERROR(LogErrorSubsystem::FAILSAFE_FENCE, LogErrorCode::ERROR_RESOLVED);
     }

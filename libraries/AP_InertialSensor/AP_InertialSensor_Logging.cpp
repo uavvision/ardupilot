@@ -5,6 +5,7 @@
 #include "AP_InertialSensor.h"
 #include "AP_InertialSensor_Backend.h"
 
+#include <AP_AHRS/AP_AHRS.h>
 #include <AP_Logger/AP_Logger.h>
 
 // Write ACC data packet: raw accel data
@@ -140,6 +141,7 @@ bool AP_InertialSensor::BatchSampler::Write_ISBD() const
 }
 #endif
 
+#if AP_INERTIALSENSOR_HARMONICNOTCH_ENABLED
 // @LoggerMessage: FTN
 // @Description: Filter Tuning Message - per motor
 // @Field: TimeUS: microseconds since system startup
@@ -194,9 +196,9 @@ void AP_InertialSensor::write_notch_log_messages() const
 
         // ask the HarmonicNotchFilter object for primary gyro to
         // log the actual notch centers
-        const uint8_t primary_gyro = AP::ahrs().get_primary_gyro_index();
-        notch.filter[primary_gyro].log_notch_centers(i, now_us);
+        notch.filter[_primary].log_notch_centers(i, now_us);
     }
 }
+#endif  // AP_INERTIALSENSOR_HARMONICNOTCH_ENABLED
 
 #endif  // HAL_LOGGING_ENABLED

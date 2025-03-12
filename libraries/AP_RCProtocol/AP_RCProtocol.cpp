@@ -23,7 +23,9 @@
 
 #include "AP_RCProtocol_PPMSum.h"
 #include "AP_RCProtocol_DSM.h"
+#include "AP_RCProtocol_Emlid_RCIO.h"
 #include "AP_RCProtocol_IBUS.h"
+#include "AP_RCProtocol_IOMCU.h"
 #include "AP_RCProtocol_SBUS.h"
 #include "AP_RCProtocol_SUMD.h"
 #include "AP_RCProtocol_SRXL.h"
@@ -36,65 +38,91 @@
 #include "AP_RCProtocol_GHST.h"
 #include "AP_RCProtocol_MAVLinkRadio.h"
 #include "AP_RCProtocol_Joystick_SFML.h"
+#include "AP_RCProtocol_UDP.h"
+#include "AP_RCProtocol_FDM.h"
+#include "AP_RCProtocol_Radio.h"
 #include <AP_Math/AP_Math.h>
 #include <RC_Channel/RC_Channel.h>
 
 #include <AP_Vehicle/AP_Vehicle_Type.h>
+
+#include <GCS_MAVLink/GCS.h>
 
 extern const AP_HAL::HAL& hal;
 
 void AP_RCProtocol::init()
 {
 #if AP_RCPROTOCOL_PPMSUM_ENABLED
-    backend[AP_RCProtocol::PPMSUM] = new AP_RCProtocol_PPMSum(*this);
+    backend[AP_RCProtocol::PPMSUM] = NEW_NOTHROW AP_RCProtocol_PPMSum(*this);
 #endif
 #if AP_RCPROTOCOL_IBUS_ENABLED
-    backend[AP_RCProtocol::IBUS] = new AP_RCProtocol_IBUS(*this);
+    backend[AP_RCProtocol::IBUS] = NEW_NOTHROW AP_RCProtocol_IBUS(*this);
 #endif
 #if AP_RCPROTOCOL_SBUS_ENABLED
-    backend[AP_RCProtocol::SBUS] = new AP_RCProtocol_SBUS(*this, true, 100000);
+    backend[AP_RCProtocol::SBUS] = NEW_NOTHROW AP_RCProtocol_SBUS(*this, true, 100000);
 #endif
 #if AP_RCPROTOCOL_FASTSBUS_ENABLED
-    backend[AP_RCProtocol::FASTSBUS] = new AP_RCProtocol_SBUS(*this, true, 200000);
+    backend[AP_RCProtocol::FASTSBUS] = NEW_NOTHROW AP_RCProtocol_SBUS(*this, true, 200000);
 #endif
 #if AP_RCPROTOCOL_DSM_ENABLED
-    backend[AP_RCProtocol::DSM] = new AP_RCProtocol_DSM(*this);
+    backend[AP_RCProtocol::DSM] = NEW_NOTHROW AP_RCProtocol_DSM(*this);
 #endif
 #if AP_RCPROTOCOL_SUMD_ENABLED
-    backend[AP_RCProtocol::SUMD] = new AP_RCProtocol_SUMD(*this);
+    backend[AP_RCProtocol::SUMD] = NEW_NOTHROW AP_RCProtocol_SUMD(*this);
 #endif
 #if AP_RCPROTOCOL_SRXL_ENABLED
-    backend[AP_RCProtocol::SRXL] = new AP_RCProtocol_SRXL(*this);
+    backend[AP_RCProtocol::SRXL] = NEW_NOTHROW AP_RCProtocol_SRXL(*this);
 #endif
 #if AP_RCPROTOCOL_SBUS_NI_ENABLED
-    backend[AP_RCProtocol::SBUS_NI] = new AP_RCProtocol_SBUS(*this, false, 100000);
+    backend[AP_RCProtocol::SBUS_NI] = NEW_NOTHROW AP_RCProtocol_SBUS(*this, false, 100000);
 #endif
 #if AP_RCPROTOCOL_SRXL2_ENABLED
-    backend[AP_RCProtocol::SRXL2] = new AP_RCProtocol_SRXL2(*this);
+    backend[AP_RCProtocol::SRXL2] = NEW_NOTHROW AP_RCProtocol_SRXL2(*this);
 #endif
 #if AP_RCPROTOCOL_CRSF_ENABLED
-    backend[AP_RCProtocol::CRSF] = new AP_RCProtocol_CRSF(*this);
+    backend[AP_RCProtocol::CRSF] = NEW_NOTHROW AP_RCProtocol_CRSF(*this);
 #endif
 #if AP_RCPROTOCOL_FPORT2_ENABLED
-    backend[AP_RCProtocol::FPORT2] = new AP_RCProtocol_FPort2(*this, true);
+    backend[AP_RCProtocol::FPORT2] = NEW_NOTHROW AP_RCProtocol_FPort2(*this, true);
 #endif
 #if AP_RCPROTOCOL_ST24_ENABLED
-    backend[AP_RCProtocol::ST24] = new AP_RCProtocol_ST24(*this);
+    backend[AP_RCProtocol::ST24] = NEW_NOTHROW AP_RCProtocol_ST24(*this);
 #endif
 #if AP_RCPROTOCOL_FPORT_ENABLED
-    backend[AP_RCProtocol::FPORT] = new AP_RCProtocol_FPort(*this, true);
+    backend[AP_RCProtocol::FPORT] = NEW_NOTHROW AP_RCProtocol_FPort(*this, true);
 #endif
 #if AP_RCPROTOCOL_DRONECAN_ENABLED
-    backend[AP_RCProtocol::DRONECAN] = new AP_RCProtocol_DroneCAN(*this);
+    backend[AP_RCProtocol::DRONECAN] = NEW_NOTHROW AP_RCProtocol_DroneCAN(*this);
 #endif
 #if AP_RCPROTOCOL_GHST_ENABLED
-    backend[AP_RCProtocol::GHST] = new AP_RCProtocol_GHST(*this);
+    backend[AP_RCProtocol::GHST] = NEW_NOTHROW AP_RCProtocol_GHST(*this);
 #endif
 #if AP_RCPROTOCOL_MAVLINK_RADIO_ENABLED
-    backend[AP_RCProtocol::MAVLINK_RADIO] = new AP_RCProtocol_MAVLinkRadio(*this);
+    backend[AP_RCProtocol::MAVLINK_RADIO] = NEW_NOTHROW AP_RCProtocol_MAVLinkRadio(*this);
 #endif
 #if AP_RCPROTOCOL_JOYSTICK_SFML_ENABLED
-    backend[AP_RCProtocol::JOYSTICK_SFML] = new AP_RCProtocol_Joystick_SFML(*this);
+    backend[AP_RCProtocol::JOYSTICK_SFML] = NEW_NOTHROW AP_RCProtocol_Joystick_SFML(*this);
+#endif
+#if AP_RCPROTOCOL_UDP_ENABLED
+    const auto UDP_backend = NEW_NOTHROW AP_RCProtocol_UDP(*this);
+    backend[AP_RCProtocol::UDP] = UDP_backend;
+#endif
+#if AP_RCPROTOCOL_FDM_ENABLED
+    const auto FDM_backend = NEW_NOTHROW AP_RCProtocol_FDM(*this);;
+    backend[AP_RCProtocol::FDM] = FDM_backend;
+#if AP_RCPROTOCOL_UDP_ENABLED
+    // the UDP-Packed16Bit backend gives way to the FDM backend:
+    UDP_backend->set_fdm_backend(FDM_backend);
+#endif  // AP_RCPROTOCOL_UDP_ENABLED
+#endif  // AP_RCPROTOCOL_FDM_ENABLED
+#if AP_RCPROTOCOL_RADIO_ENABLED
+    backend[AP_RCProtocol::RADIO] = NEW_NOTHROW AP_RCProtocol_Radio(*this);
+#endif
+#if AP_RCPROTOCOL_IOMCU_ENABLED
+    backend[AP_RCProtocol::IOMCU] = NEW_NOTHROW AP_RCProtocol_IOMCU(*this);
+#endif  // AP_RCPROTOCOL_IOMCU_ENABLED
+#if AP_RCPROTOCOL_EMLID_RCIO_ENABLED
+    backend[AP_RCProtocol::EMLID_RCIO] = NEW_NOTHROW AP_RCProtocol_Emlid_RCIO(*this);
 #endif
 }
 
@@ -110,6 +138,13 @@ AP_RCProtocol::~AP_RCProtocol()
 
 bool AP_RCProtocol::should_search(uint32_t now_ms) const
 {
+#if AP_RCPROTOCOL_FDM_ENABLED && AP_RCPROTOCOL_UDP_ENABLED
+    // force re-detection when FDM is active and active backend is UDP values
+    if (_detected_protocol == AP_RCProtocol::UDP &&
+        ((AP_RCProtocol_FDM*)backend[AP_RCProtocol::FDM])->active()) {
+        return true;
+    }
+#endif  // AP_RCPROTOCOL_FDM_ENABLED && AP_RCPROTOCOL_UDP_ENABLED
 #if AP_RC_CHANNEL_ENABLED && !APM_BUILD_TYPE(APM_BUILD_UNKNOWN)
     if (_detected_protocol != AP_RCProtocol::NONE && !rc().option_is_enabled(RC_Channels::Option::MULTI_RECEIVER_SUPPORT)) {
         return false;
@@ -421,6 +456,39 @@ bool AP_RCProtocol::detect_async_protocol(rcprotocol_t protocol)
     return true;
 }
 
+const char *AP_RCProtocol::detected_protocol_name() const
+{
+    switch (_detected_protocol) {
+#if AP_RCPROTOCOL_IOMCU_ENABLED
+    case AP_RCProtocol::IOMCU:
+        return ((AP_RCProtocol_IOMCU*)(backend[AP_RCProtocol::IOMCU]))->get_rc_protocol();
+#endif
+    default:
+        return protocol_name_from_protocol(_detected_protocol);
+    }
+}
+
+void AP_RCProtocol::announce_detected()
+{
+    const char *src;
+    const char *name = detected_protocol_name();
+    if (name == nullptr) {
+        return;
+    }
+    switch (_detected_protocol) {
+#if AP_RCPROTOCOL_IOMCU_ENABLED
+    case AP_RCProtocol::IOMCU:
+        src = "IOMCU";
+        break;
+#endif
+    default:
+        src = using_uart() ? "Bytes" : "Pulses";
+    }
+    (void)src;  // iofirmware doesn't use this
+    (void)name;  // iofirmware doesn't use this
+    GCS_SEND_TEXT(MAV_SEVERITY_DEBUG, "RCInput: decoding %s (%s)", name, src);
+}
+
 bool AP_RCProtocol::new_input()
 {
     // if we have an extra UART from a SERIALn_PROTOCOL then check it for data
@@ -445,6 +513,21 @@ bool AP_RCProtocol::new_input()
 #if AP_RCPROTOCOL_JOYSTICK_SFML_ENABLED
         AP_RCProtocol::JOYSTICK_SFML,
 #endif
+#if AP_RCPROTOCOL_UDP_ENABLED
+        AP_RCProtocol::UDP,
+#endif
+#if AP_RCPROTOCOL_FDM_ENABLED
+        AP_RCProtocol::FDM,
+#endif
+#if AP_RCPROTOCOL_RADIO_ENABLED
+        AP_RCProtocol::RADIO,
+#endif
+#if AP_RCPROTOCOL_IOMCU_ENABLED
+        AP_RCProtocol::IOMCU,
+#endif  // AP_RCPROTOCOL_IOMCU_ENABLED
+#if AP_RCPROTOCOL_EMLID_RCIO_ENABLED
+        AP_RCProtocol::EMLID_RCIO,
+#endif
     };
     for (const auto protocol : pollable) {
         if (!detect_async_protocol(protocol)) {
@@ -453,6 +536,21 @@ bool AP_RCProtocol::new_input()
         _new_input = true;
         _last_input_ms = AP_HAL::millis();
         break;
+    }
+
+#if AP_RCPROTOCOL_IOMCU_ENABLED
+    // IOMCU takes precedence over serial-port-type-23 input etc:
+    if (((AP_RCProtocol_IOMCU*)(backend[AP_RCProtocol::IOMCU]))->active()) {
+        _detected_protocol = AP_RCProtocol::IOMCU;
+    }
+#endif
+
+    // announce protocol changes:
+    if (_detected_protocol != _last_detected_protocol ||
+        using_uart() != _last_detected_using_uart) {
+        _last_detected_protocol = _detected_protocol;
+        _last_detected_using_uart = using_uart();
+        announce_detected();
     }
 
     bool ret = _new_input;
@@ -500,7 +598,7 @@ int16_t AP_RCProtocol::get_rx_link_quality(void) const
 /*
   ask for bind start on supported receivers (eg spektrum satellite)
  */
-void AP_RCProtocol::start_bind(void)
+void AP_RCProtocol::start_bind()
 {
     for (uint8_t i = 0; i < ARRAY_SIZE(backend); i++) {
         if (backend[i] != nullptr) {
@@ -585,6 +683,26 @@ const char *AP_RCProtocol::protocol_name_from_protocol(rcprotocol_t protocol)
     case JOYSTICK_SFML:
         return "SFML";
 #endif
+#if AP_RCPROTOCOL_UDP_ENABLED
+    case UDP:
+        return "UDP";
+#endif
+#if AP_RCPROTOCOL_FDM_ENABLED
+    case FDM:
+        return "FDM";
+#endif
+#if AP_RCPROTOCOL_RADIO_ENABLED
+    case RADIO:
+        return "Radio";
+#endif
+#if AP_RCPROTOCOL_IOMCU_ENABLED
+    case IOMCU:
+        return "IOMCU";
+#endif  // AP_RCPROTOCOL_IOMCU_ENABLED
+#if AP_RCPROTOCOL_EMLID_RCIO_ENABLED
+    case EMLID_RCIO:
+        return "Emlid RCIO";
+#endif
     case NONE:
         break;
     }
@@ -592,14 +710,6 @@ const char *AP_RCProtocol::protocol_name_from_protocol(rcprotocol_t protocol)
 }
 
 #if AP_RCPROTOCOL_ENABLED
-/*
-  return protocol name
- */
-const char *AP_RCProtocol::protocol_name(void) const
-{
-    return protocol_name_from_protocol(_detected_protocol);
-}
-
 /*
   add a uart to decode
  */

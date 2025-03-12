@@ -1,8 +1,8 @@
 # hw definition file for processing by chibios_hwdef.py
 # for the JFB110 hardware
 
-# board ID for firmware load
-APJ_BOARD_ID 1110
+# board ID. See Tools/AP_Bootloader/board_types.txt
+APJ_BOARD_ID AP_HW_JFB110
 
 # MCU class and specific type
 MCU STM32H7xx STM32H755xx
@@ -316,10 +316,10 @@ PE4 LED_GREEN OUTPUT OPENDRAIN GPIO(71) LOW SPEED_VERYLOW
 PE5 LED_BLUE  OUTPUT OPENDRAIN GPIO(72) HIGH SPEED_VERYLOW
 
 # setup for "AP_BoardLED" RGB LEDs
+define AP_NOTIFY_GPIO_LED_2_ENABLED 1
 define HAL_GPIO_A_LED_PIN 72
 define HAL_GPIO_B_LED_PIN 70
 #define HAL_GPIO_C_LED_PIN 71
-define HAL_GPIO_LED_ON 0
 
 # PWM output for buzzer
 PF9 TIM14_CH1 TIM14 GPIO(73) ALARM SPEED_VERYLOW

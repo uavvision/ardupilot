@@ -6,7 +6,7 @@
 
 #include "AP_Logger_File.h"
 #include "AP_Logger_Flash_JEDEC.h"
-#include "AP_Logger_W25N01GV.h"
+#include "AP_Logger_W25NXX.h"
 #include "AP_Logger_MAVLink.h"
 
 #include <AP_InternalError/AP_InternalError.h>
@@ -54,6 +54,18 @@ extern const AP_HAL::HAL& hal;
 // by default log for 15 seconds after disarming
 #ifndef HAL_LOGGER_ARM_PERSIST
 #define HAL_LOGGER_ARM_PERSIST 15
+#endif
+
+#ifndef HAL_LOGGER_MIN_MB_FREE
+#if AP_FILESYSTEM_LITTLEFS_ENABLED
+#if AP_FILESYSTEM_LITTLEFS_FLASH_TYPE == AP_FILESYSTEM_FLASH_W25NXX
+#define HAL_LOGGER_MIN_MB_FREE 10
+#else
+#define HAL_LOGGER_MIN_MB_FREE 2
+#endif
+#else
+#define HAL_LOGGER_MIN_MB_FREE 500
+#endif
 #endif
 
 #ifndef HAL_LOGGING_BACKENDS_DEFAULT
@@ -135,9 +147,9 @@ const AP_Param::GroupInfo AP_Logger::var_info[] = {
     // @DisplayName: Old logs on the SD card will be deleted to maintain this amount of free space
     // @Description: Set this such that the free space is larger than your largest typical flight log
     // @Units: MB
-    // @Range: 10 1000
+    // @Range: 2 1000
     // @User: Standard
-    AP_GROUPINFO("_FILE_MB_FREE",  7, AP_Logger, _params.min_MB_free, 500),
+    AP_GROUPINFO("_FILE_MB_FREE",  7, AP_Logger, _params.min_MB_free, HAL_LOGGER_MIN_MB_FREE),
 
     // @Param: _FILE_RATEMAX
     // @DisplayName: Maximum logging rate for file backend
@@ -247,7 +259,7 @@ void AP_Logger::init(const AP_Int32 &log_bitmask, const struct LogStructure *str
             return;
         }
         LoggerMessageWriter_DFLogStart *message_writer =
-            new LoggerMessageWriter_DFLogStart();
+            NEW_NOTHROW LoggerMessageWriter_DFLogStart();
         if (message_writer == nullptr)  {
             AP_BoardConfig::allocation_error("message writer");
         }
@@ -489,7 +501,7 @@ bool AP_Logger::validate_structure(const struct LogStructure *logstructure, cons
     if (false && passed) {
         for (uint8_t j=0; j<strlen(logstructure->multipliers); j++) {
             const char fmt = logstructure->format[j];
-            if (fmt != 'f') {
+            if (fmt != 'f' && fmt != 'd' && fmt != 'g') {
                 continue;
             }
             const char logmultiplier = logstructure->multipliers[j];
@@ -614,16 +626,6 @@ void AP_Logger::Write_MessageF(const char *fmt, ...)
 void AP_Logger::backend_starting_new_log(const AP_Logger_Backend *backend)
 {
     _log_start_count++;
-
-    for (uint8_t i=0; i<_next_backend; i++) {
-        if (backends[i] == backend) { // pointer comparison!
-            // reset sent masks
-            for (struct log_write_fmt *f = log_write_fmts; f; f=f->next) {
-                f->sent_mask &= ~(1<<i);
-            }
-            break;
-        }
-    }
 }
 
 bool AP_Logger::should_log(const uint32_t mask) const
@@ -714,7 +716,7 @@ void AP_Logger::save_format_Replay(const void *pBuffer)
 {
     if (((uint8_t *)pBuffer)[2] == LOG_FORMAT_MSG) {
         struct log_Format *fmt = (struct log_Format *)pBuffer;
-        struct log_write_fmt *f = new log_write_fmt;
+        struct log_write_fmt *f = NEW_NOTHROW log_write_fmt;
         f->msg_type = fmt->type;
         f->msg_len = fmt->length;
         f->name = strndup(fmt->name, sizeof(fmt->name));
@@ -843,7 +845,7 @@ uint16_t AP_Logger::get_max_num_logs() {
 }
 
 /* we're started if any of the backends are started */
-bool AP_Logger::logging_started(void) {
+bool AP_Logger::logging_started(void) const {
     for (uint8_t i=0; i< _next_backend; i++) {
         if (backends[i]->logging_started()) {
             return true;
@@ -906,9 +908,10 @@ void AP_Logger::Write_Parameter(const char *name, float value)
 }
 
 void AP_Logger::Write_Mission_Cmd(const AP_Mission &mission,
-                                            const AP_Mission::Mission_Command &cmd)
+                                  const AP_Mission::Mission_Command &cmd,
+                                  LogMessages id)
 {
-    FOR_EACH_BACKEND(Write_Mission_Cmd(mission, cmd));
+    FOR_EACH_BACKEND(Write_Mission_Cmd(mission, cmd, id));
 }
 
 #if HAL_RALLY_ENABLED
@@ -950,12 +953,7 @@ void AP_Logger::Write_NamedValueFloat(const char *name, float value)
 void AP_Logger::Safe_Write_Emit_FMT(log_write_fmt *f)
 {
     for (uint8_t i=0; i<_next_backend; i++) {
-        if (!(f->sent_mask & (1U<<i))) {
-            if (!backends[i]->Write_Emit_FMT(f->msg_type)) {
-                continue;
-            }
-            f->sent_mask |= (1U<<i);
-        }
+        backends[i]->Safe_Write_Emit_FMT(f->msg_type);
     }
 }
 
@@ -1041,12 +1039,6 @@ void AP_Logger::WriteV(const char *name, const char *labels, const char *units, 
     }
 
     for (uint8_t i=0; i<_next_backend; i++) {
-        if (!(f->sent_mask & (1U<<i))) {
-            if (!backends[i]->Write_Emit_FMT(f->msg_type)) {
-                continue;
-            }
-            f->sent_mask |= (1U<<i);
-        }
         va_list arg_copy;
         va_copy(arg_copy, arg_list);
         backends[i]->Write(f->msg_type, arg_copy, is_critical, is_streaming);
@@ -1313,8 +1305,15 @@ int16_t AP_Logger::find_free_msg_type() const
  * It is assumed that logstruct's char* variables are valid strings of
  * maximum lengths for those fields (given in LogStructure.h e.g. LS_NAME_SIZE)
  */
-bool AP_Logger::fill_log_write_logstructure(struct LogStructure &logstruct, const uint8_t msg_type) const
+bool AP_Logger::fill_logstructure(struct LogStructure &logstruct, const uint8_t msg_type) const
 {
+    // check the static lists first...
+    const LogStructure *found = structure_for_msg_type(msg_type);
+    if (found != nullptr) {
+        logstruct = *found;
+        return true;
+    }
+
     // find log structure information corresponding to msg_type:
     struct log_write_fmt *f;
     for (f = log_write_fmts; f; f=f->next) {
@@ -1368,6 +1367,7 @@ int16_t AP_Logger::Write_calc_msg_len(const char *fmt) const
         case 'd' : len += sizeof(double); break;
         case 'e' : len += sizeof(int32_t); break;
         case 'f' : len += sizeof(float); break;
+        case 'g' : len += sizeof(float16_s); break;
         case 'h' : len += sizeof(int16_t); break;
         case 'i' : len += sizeof(int32_t); break;
         case 'n' : len += sizeof(char[4]); break;
@@ -1567,7 +1567,10 @@ void AP_Logger::prepare_at_arming_sys_file_logging()
      */
     static const char *log_content_filenames[] = {
         "@SYS/uarts.txt",
+#ifdef HAL_DEBUG_BUILD
+        // logging dma.txt has a performance impact
         "@SYS/dma.txt",
+#endif
         "@SYS/memory.txt",
         "@SYS/threads.txt",
         "@SYS/timers.txt",
@@ -1636,13 +1639,13 @@ void AP_Logger::log_file_content(const char *filename)
 void AP_Logger::log_file_content(FileContent &file_content, const char *filename)
 {
     WITH_SEMAPHORE(file_content.sem);
-    auto *file = new file_list;
+    auto *file = NEW_NOTHROW file_list;
     if (file == nullptr) {
         return;
     }
     // make copy to allow original to go out of scope
     const size_t len = strlen(filename)+1;
-    char * tmp_filename = new char[len];
+    char * tmp_filename = NEW_NOTHROW char[len];
     if (tmp_filename == nullptr) {
         delete file;
         return;

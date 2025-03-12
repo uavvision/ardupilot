@@ -5,6 +5,12 @@
    assistance from Paul Riseborough, testing by Henry Wurzburg
 ]]--
 -- luacheck: ignore 212 (Unused argument)
+---@diagnostic disable: param-type-mismatch
+---@diagnostic disable: undefined-field
+---@diagnostic disable: missing-parameter
+---@diagnostic disable: need-check-nil
+---@diagnostic disable: undefined-global
+---@diagnostic disable: inject-field
 
 -- setup param block for aerobatics, reserving 35 params beginning with AERO_
 local PARAM_TABLE_KEY = 70
@@ -652,8 +658,8 @@ end
 --[[
    create a class that inherits from a base class
 --]]
-local function inheritsFrom(baseClass, _name)
-    local new_class = { name = _name }
+local function inheritsFrom(baseClass, name_in)
+    local new_class = { name = name_in }
     local class_mt = { __index = new_class }
 
     function new_class:create()
@@ -1651,10 +1657,8 @@ end
 --[[
    perform a rudder over maneuver
 --]]
-function rudder_over(_direction, _min_speed)
+function rudder_over(direction, min_speed)
    local self = {}
-   local direction = _direction
-   local min_speed = _min_speed
    local reached_speed = false
    local kick_started = false
    local pitch2_done = false
@@ -1815,12 +1819,10 @@ end
 --[[
    takeoff controller
 --]]
-function takeoff_controller(_distance, _thr_slew)
+function takeoff_controller(distance, thr_slew)
    local self = {}
    local start_time = 0
    local start_pos = nil
-   local thr_slew = _thr_slew
-   local distance = _distance
    local all_done = false
    local initial_yaw_deg = math.deg(ahrs:get_yaw())
    local yaw_correction_tconst = 1.0
@@ -2117,7 +2119,9 @@ end
 
 -- log a pose from position and quaternion attitude
 function log_pose(logname, pos, quat)
-   logger.write(logname, 'px,py,pz,q1,q2,q3,q4,r,p,y', 'ffffffffff',
+   local loc = ahrs:get_origin():copy()
+   loc:offset(pos:x(),pos:y())
+   logger.write(logname, 'px,py,pz,q1,q2,q3,q4,r,p,y,Lat,Lon', 'ffffffffffLL',
                 pos:x(),
                 pos:y(),
                 pos:z(),
@@ -2127,7 +2131,9 @@ function log_pose(logname, pos, quat)
                 quat:q4(),
                 math.deg(quat:get_euler_roll()),
                 math.deg(quat:get_euler_pitch()),
-                math.deg(quat:get_euler_yaw()))
+                math.deg(quat:get_euler_yaw()),
+                loc:lat(),
+                loc:lng())
 end
 
 --[[
@@ -2234,11 +2240,9 @@ end
    milliseconds means we lose accuracy over time. At 9 hours we have
    an accuracy of about 1 millisecond
 --]]
-local function JitterCorrection(_max_lag_ms, _convergence_loops)
+local function JitterCorrection(max_lag_ms, convergence_loops)
    local self = {}
 
-   local max_lag_ms = _max_lag_ms
-   local convergence_loops = _convergence_loops
    local link_offset_ms = 0
    local min_sample_ms = 0
    local initialised = false
@@ -2305,8 +2309,8 @@ local function mavlink_receiver()
 
    msg_map[NAMED_VALUE_FLOAT_msgid] = "NAMED_VALUE_FLOAT"
 
-   -- initialise mavlink rx with number of messages, and buffer depth
-   mavlink.init(1, 10)
+   -- initialize MAVLink rx with buffer depth and number of rx message IDs to register
+   mavlink.init(10, 1)
 
    -- register message id to receive
    mavlink.register_rx_msgid(NAMED_VALUE_FLOAT_msgid)
@@ -2717,8 +2721,10 @@ function do_path()
                    lookahead_bf_dps:y(),
                    path_rate_bf_dps:z(),
                    lookahead_bf_dps:z())
-      path_rate_bf_dps:y(lookahead_bf_dps:y())
-      path_rate_bf_dps:z(lookahead_bf_dps:z())
+      if not Vec3IsNaN(lookahead_bf_dps) then
+         path_rate_bf_dps:y(lookahead_bf_dps:y())
+         path_rate_bf_dps:z(lookahead_bf_dps:z())
+      end
    end
    
    --[[
@@ -3029,7 +3035,9 @@ function load_trick(id)
    local pc = path_composer(name, paths)
    gcs:send_text(MAV_SEVERITY.INFO, string.format("Loaded trick%u '%s'", id, name))
    command_table[id] = PathFunction(pc, name)
-   logger:log_file_content(filename)
+   if logger.log_file_content then
+      logger:log_file_content(filename)
+   end
 
    calculate_timestamps(command_table[id])
 end

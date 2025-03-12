@@ -51,7 +51,7 @@
  */
 #ifndef AP_PARAM_MAX_EMBEDDED_PARAM
   #if FORCE_APJ_DEFAULT_PARAMETERS
-    #if BOARD_FLASH_SIZE <= 1024
+    #if HAL_PROGRAM_SIZE_LIMIT_KB <= 1024
       #define AP_PARAM_MAX_EMBEDDED_PARAM 1024
     #else
       #define AP_PARAM_MAX_EMBEDDED_PARAM 8192
@@ -173,7 +173,7 @@
 #define GOBJECTN(v, pname, name, class)      { name, (const void *)&AP_PARAM_VEHICLE_NAME.v,       {group_info : class::var_info},      0,                                                  Parameters::k_param_ ## pname,      AP_PARAM_GROUP }
 #define PARAM_VEHICLE_INFO                   { "",   (const void *)&AP_PARAM_VEHICLE_NAME,         {group_info : AP_Vehicle::var_info}, 0,                                                  Parameters::k_param_vehicle,        AP_PARAM_GROUP }
 #define AP_VAREND                            { "",   nullptr,                                      {group_info : nullptr },             0,                                                  0,                                  AP_PARAM_NONE }
-
+#define AP_GROUP_ELEM_IDX(subgrp_idx, grp_idx) (grp_idx << 6 | subgrp_idx)
 
 enum ap_var_type {
     AP_PARAM_NONE    = 0,
@@ -430,6 +430,11 @@ public:
     ///
     static bool load_all();
 
+    // return true if eeprom is full, used for arming check
+    static bool get_eeprom_full(void) {
+        return eeprom_full;
+    }
+
     // returns storage space used:
     static uint16_t storage_used() { return sentinal_offset; }
 
@@ -495,11 +500,17 @@ public:
       values without changing the parameter indexes. This will return
       true if the parameter was converted from an old parameter value
     */
-    bool convert_parameter_width(ap_var_type old_ptype, float scale_factor=1.0);
+    bool convert_parameter_width(ap_var_type old_ptype, float scale_factor=1.0) {
+        return _convert_parameter_width(old_ptype, scale_factor, false);
+    }
     bool convert_centi_parameter(ap_var_type old_ptype) {
         return convert_parameter_width(old_ptype, 0.01f);
     }
-    
+    // Converting bitmasks should be done bitwise rather than numerically
+    bool convert_bitmask_parameter_width(ap_var_type old_ptype) {
+        return _convert_parameter_width(old_ptype, 1.0, true);
+    }
+
     // convert a single parameter with scaling
     enum {
         CONVERT_FLAG_REVERSE=1, // handle _REV -> _REVERSED conversion
@@ -785,6 +796,13 @@ private:
     // return true if the parameter is configured in EEPROM/FRAM
     bool configured_in_storage(void) const;
 
+    /*
+      convert width of a parameter, allowing update to wider scalar
+      values without changing the parameter indexes. This will return
+      true if the parameter was converted from an old parameter value
+    */
+    bool _convert_parameter_width(ap_var_type old_ptype, float scale_factor, bool bitmask);
+
     // send a parameter to all GCS instances
     void send_parameter(const char *name, enum ap_var_type param_header_type, uint8_t idx) const;
 
@@ -852,6 +870,8 @@ private:
     };
     static defaults_list *default_list;
     static void check_default(AP_Param *ap, float *default_value);
+
+    static bool eeprom_full;
 };
 
 namespace AP {
@@ -1070,6 +1090,9 @@ public:
     void set(eclass v) {
         AP_Int8::set(int8_t(v));
     }
+    void set_and_save(eclass v) {
+        AP_Int8::set_and_save(int8_t(v));
+    }
 };
 
 template<typename eclass>
@@ -1081,5 +1104,8 @@ public:
     }
     void set(eclass v) {
         AP_Int16::set(int16_t(v));
+    }
+    void set_and_save(eclass v) {
+        AP_Int16::set_and_save(int16_t(v));
     }
 };

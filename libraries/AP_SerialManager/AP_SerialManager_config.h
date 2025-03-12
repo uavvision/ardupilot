@@ -19,7 +19,7 @@
  */
 #pragma once
 
-#include <AP_HAL/AP_HAL.h>
+#include <AP_HAL/AP_HAL_Boards.h>
 #include <AP_Networking/AP_Networking_Config.h>
 #include <AP_InertialSensor/AP_InertialSensor_config.h>
 
@@ -57,7 +57,7 @@
 
 
 #ifndef AP_SERIALMANAGER_REGISTER_ENABLED
-#define AP_SERIALMANAGER_REGISTER_ENABLED BOARD_FLASH_SIZE > 1024 && (AP_NETWORKING_ENABLED || HAL_ENABLE_DRONECAN_DRIVERS)
+#define AP_SERIALMANAGER_REGISTER_ENABLED HAL_PROGRAM_SIZE_LIMIT_KB > 1024 && (AP_NETWORKING_ENABLED || HAL_ENABLE_DRONECAN_DRIVERS)
 #endif
 
 #ifndef AP_SERIALMANAGER_IMUOUT_ENABLED
@@ -70,6 +70,9 @@
 // serial ports registered by AP_DroneCAN will use IDs starting at 41/51 for the first port
 #define AP_SERIALMANAGER_CAN_D1_PORT_1         41 // CAN_D1_UC_S1_*
 #define AP_SERIALMANAGER_CAN_D2_PORT_1         51 // CAN_D2_UC_S1_*
+
+// serial device simulation ports registered by AP_Scripting will use IDs starting at 61 for the first port
+#define AP_SERIALMANAGER_SCR_PORT_1         61 // SCR_SDEV1_*
 
  // console default baud rates and buffer sizes
 #ifdef DEFAULT_SERIAL0_BAUD
@@ -109,10 +112,6 @@
 #define AP_SERIALMANAGER_GIMBAL_BAUD            115200
 #define AP_SERIALMANAGER_GIMBAL_BUFSIZE_RX      128
 #define AP_SERIALMANAGER_GIMBAL_BUFSIZE_TX      128
-
-#define AP_SERIALMANAGER_VOLZ_BAUD           115
-#define AP_SERIALMANAGER_VOLZ_BUFSIZE_RX     128
-#define AP_SERIALMANAGER_VOLZ_BUFSIZE_TX     128
 
 #define AP_SERIALMANAGER_ROBOTIS_BUFSIZE_RX  128
 #define AP_SERIALMANAGER_ROBOTIS_BUFSIZE_TX  128

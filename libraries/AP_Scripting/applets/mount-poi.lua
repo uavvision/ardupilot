@@ -19,6 +19,10 @@
 --  10. interpolate between test_loc and prev_test_loc to find the lat, lon, alt (above sea-level) where alt-above-terrain is zero
 --  11. display the POI to the user
 
+---@diagnostic disable: param-type-mismatch
+---@diagnostic disable: cast-local-type
+---@diagnostic disable: missing-parameter
+
 -- global definitions
 local MAV_SEVERITY = {EMERGENCY=0, ALERT=1, CRITICAL=2, ERROR=3, WARNING=4, NOTICE=5, INFO=6, DEBUG=7}
 local ALT_FRAME_ABSOLUTE = 0
@@ -47,8 +51,6 @@ local last_roi_switch_pos = 0           -- last known rc roi switch position.  U
 local success_count = 0                 -- count of the number of POI calculations (sent to GCS in CAMERA_FEEDBACK message)
 
 -- mavlink message definition
--- initialise mavlink rx with number of messages, and buffer depth
-mavlink.init(1, 10)
 local messages = {}
 messages[180] = { -- CAMERA_FEEDBACK
              { "time_usec", "<I8" },

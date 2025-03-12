@@ -63,7 +63,6 @@ private:
     const float Q0; // process noise matrix top left and middle element
     const float Q1; // process noise matrix bottom right element
     Vector3f state; // state vector
-    const float DT; // time delta
 };
 
 class AP_Airspeed
@@ -171,6 +170,7 @@ public:
         ON_FAILURE_AHRS_WIND_MAX_RECOVERY_DO_REENABLE         = (1<<1),   // If set then automatically enable the airspeed sensor use when healthy again.
         DISABLE_VOLTAGE_CORRECTION                            = (1<<2),
         USE_EKF_CONSISTENCY                                   = (1<<3),
+        REPORT_OFFSET                                         = (1<<4),   // report offset cal to GCS
     };
 
     enum airspeed_type {
@@ -191,6 +191,9 @@ public:
         TYPE_MSP=14,
         TYPE_I2C_ASP5033=15,
         TYPE_EXTERNAL=16,
+        TYPE_AUAV_10IN=17,
+        TYPE_AUAV_5IN=18,
+        TYPE_AUAV_30IN=19,
         TYPE_SITL=100,
     };
 
@@ -240,8 +243,6 @@ private:
 
     AP_Airspeed_Params param[AIRSPEED_MAX_SENSORS];
 
-    CalibrationState calibration_state[AIRSPEED_MAX_SENSORS];
-
     struct airspeed_state {
         float   raw_airspeed;
         float   airspeed;
@@ -258,6 +259,7 @@ private:
             float    sum;
             uint16_t count;
             uint16_t read_count;
+            CalibrationState state;
         } cal;
 
 #if AP_AIRSPEED_AUTOCAL_ENABLE
@@ -291,9 +293,6 @@ private:
     uint32_t _log_bit = -1;     // stores which bit in LOG_BITMASK is used to indicate we should log airspeed readings
 
     void read(uint8_t i);
-    // return the differential pressure in Pascal for the last airspeed reading for the requested instance
-    // returns 0 if the sensor is not enabled
-    float get_pressure(uint8_t i);
 
     // get the health probability
     float get_health_probability(uint8_t i) const {

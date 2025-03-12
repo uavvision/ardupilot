@@ -6,7 +6,6 @@ Andrew Tridgell, October 2011
 
  AP_FLAKE8_CLEAN
 """
-from __future__ import print_function
 import atexit
 import fnmatch
 import copy
@@ -39,8 +38,6 @@ from pymavlink.generator import mavtemplate
 from vehicle_test_suite import Test
 
 tester = None
-
-build_opts = None
 
 
 def buildlogs_dirpath():
@@ -98,7 +95,7 @@ def build_binaries():
 
 def build_examples(**kwargs):
     """Build examples."""
-    for target in 'Pixhawk1', 'navio', 'linux':
+    for target in 'Pixhawk1', 'navio', 'linux', 'sitl':
         print("Running build.examples for %s" % target)
         try:
             util.build_examples(target, **kwargs)
@@ -156,17 +153,17 @@ def run_unit_tests():
 
 def run_clang_scan_build():
     """Run Clang Scan-build utility."""
-    if util.run_cmd("scan-build python waf configure",
+    if util.run_cmd("scan-build python3 waf configure",
                     directory=util.reltopdir('.')) != 0:
         print("Failed scan-build-configure")
         return False
 
-    if util.run_cmd("scan-build python waf clean",
+    if util.run_cmd("scan-build python3 waf clean",
                     directory=util.reltopdir('.')) != 0:
         print("Failed scan-build-clean")
         return False
 
-    if util.run_cmd("scan-build python waf build",
+    if util.run_cmd("scan-build python3 waf build",
                     directory=util.reltopdir('.')) != 0:
         print("Failed scan-build-build")
         return False
@@ -278,6 +275,9 @@ __bin_names = {
     "CopterTests2b": "arducopter",
 
     "Plane": "arduplane",
+    "PlaneTests1a": "arduplane",
+    "PlaneTests1b": "arduplane",
+
     "Rover": "ardurover",
     "Tracker": "antennatracker",
     "Helicopter": "arducopter-heli",
@@ -287,7 +287,9 @@ __bin_names = {
     "BalanceBot": "ardurover",
     "Sailboat": "ardurover",
     "SITLPeriphUniversal": ("sitl_periph_universal", "AP_Periph"),
+    "SITLPeriphBattMon": ("sitl_periph_battmon", "AP_Periph"),
     "CAN": "arducopter",
+    "BattCAN": "arducopter",
 }
 
 
@@ -350,6 +352,8 @@ tester_class_map = {
     "test.CopterTests2a": arducopter.AutoTestCopterTests2a, # 8m23s
     "test.CopterTests2b": arducopter.AutoTestCopterTests2b, # 8m18s
     "test.Plane": arduplane.AutoTestPlane,
+    "test.PlaneTests1a": arduplane.AutoTestPlaneTests1a,
+    "test.PlaneTests1b": arduplane.AutoTestPlaneTests1b,
     "test.QuadPlane": quadplane.AutoTestQuadPlane,
     "test.Rover": rover.AutoTestRover,
     "test.BalanceBot": balancebot.AutoTestBalanceBot,
@@ -358,11 +362,15 @@ tester_class_map = {
     "test.Sub": ardusub.AutoTestSub,
     "test.Tracker": antennatracker.AutoTestTracker,
     "test.CAN": arducopter.AutoTestCAN,
+    "test.BattCAN": arducopter.AutoTestBattCAN,
 }
 
 supplementary_test_binary_map = {
     "test.CAN": ["sitl_periph_universal:AP_Periph:0:Tools/autotest/default_params/periph.parm,Tools/autotest/default_params/quad-periph.parm", # noqa: E501
                  "sitl_periph_universal:AP_Periph:1:Tools/autotest/default_params/periph.parm"],
+    "test.BattCAN": [
+        "sitl_periph_battmon:AP_Periph:0:Tools/autotest/default_params/periph-battmon.parm,Tools/autotest/default_params/quad-periph.parm", # noqa: E501
+    ],
 }
 
 
@@ -416,8 +424,6 @@ def run_step(step):
     if opts.Werror:
         build_opts['extra_configure_args'].append("--Werror")
 
-    build_opts = build_opts
-
     vehicle_binary = None
     board = "sitl"
     if step == 'build.Plane':
@@ -444,6 +450,10 @@ def run_step(step):
     if step == 'build.SITLPeriphUniversal':
         vehicle_binary = 'bin/AP_Periph'
         board = 'sitl_periph_universal'
+
+    if step == 'build.SITLPeriphBattMon':
+        vehicle_binary = 'bin/AP_Periph'
+        board = 'sitl_periph_battmon'
 
     if step == 'build.Replay':
         return util.build_replay(board='SITL')
@@ -497,7 +507,6 @@ def run_step(step):
         "gdbserver": opts.gdbserver,
         "breakpoints": opts.breakpoint,
         "disable_breakpoints": opts.disable_breakpoints,
-        "frame": opts.frame,
         "_show_test_timings": opts.show_test_timings,
         "force_ahrs_type": opts.force_ahrs_type,
         "num_aux_imus" : opts.num_aux_imus,
@@ -507,6 +516,7 @@ def run_step(step):
         "reset_after_every_test": opts.reset_after_every_test,
         "build_opts": copy.copy(build_opts),
         "generate_junit": opts.junit,
+        "enable_fgview": opts.enable_fgview,
     }
     if opts.speedup is not None:
         fly_opts["speedup"] = opts.speedup
@@ -853,6 +863,9 @@ if __name__ == "__main__":
     parser.add_option("--viewerip",
                       default=None,
                       help='IP address to send MAVLink and fg packets to')
+    parser.add_option("--enable-fgview",
+                      action='store_true',
+                      help="Enable FlightGear output")
     parser.add_option("--map",
                       action='store_true',
                       default=False,
@@ -865,10 +878,6 @@ if __name__ == "__main__":
                       default=None,
                       type='int',
                       help='maximum runtime in seconds')
-    parser.add_option("--frame",
-                      type='string',
-                      default=None,
-                      help='specify frame type')
     parser.add_option("--show-test-timings",
                       action="store_true",
                       default=False,
@@ -1086,6 +1095,9 @@ if __name__ == "__main__":
         'build.SITLPeriphUniversal',
         'test.CAN',
 
+        'build.SITLPeriphBattMon',
+        'test.BattCAN',
+
         # convertgps disabled as it takes 5 hours
         # 'convertgpx',
     ]
@@ -1099,6 +1111,9 @@ if __name__ == "__main__":
 
         'test.CopterTests2a',
         'test.CopterTests2b',
+
+        'test.PlaneTests1a',
+        'test.PlaneTests1b',
 
         'clang-scan-build',
     ]

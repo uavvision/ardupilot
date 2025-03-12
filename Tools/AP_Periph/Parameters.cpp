@@ -69,6 +69,10 @@ extern const AP_HAL::HAL &hal;
   #define APD_ESC_SERIAL_1 -1
 #endif
 
+#ifndef AP_PERIPH_PROBE_CONTINUOUS
+#define AP_PERIPH_PROBE_CONTINUOUS 0
+#endif
+
 /*
  *  AP_Periph parameter definitions
  *
@@ -82,9 +86,9 @@ const AP_Param::Info AP_Periph_FW::var_info[] = {
     GSCALAR(format_version,         "FORMAT_VERSION", 0),
 
     // @Param: CAN_NODE
-    // @DisplayName: UAVCAN node that is used for this network
-    // @Description: UAVCAN node should be set implicitly or 0 for dynamic node allocation
-    // @Range: 0 250
+    // @DisplayName: DroneCAN node ID used by this node on all networks
+    // @Description: Value of 0 requests any ID from a DNA server, any other value sets that ID ignoring DNA
+    // @Range: 0 127
     // @User: Advanced
     // @RebootRequired: True
     GSCALAR(can_node,         "CAN_NODE", HAL_CAN_DEFAULT_NODE_ID),
@@ -209,7 +213,7 @@ const AP_Param::Info AP_Periph_FW::var_info[] = {
     // @User: Advanced
     GSCALAR(serial_number, "BRD_SERIAL_NUM", 0),
 
-#ifdef HAL_PERIPH_ENABLE_BUZZER_WITHOUT_NOTIFY
+#if AP_PERIPH_BUZZER_WITHOUT_NOTIFY_ENABLED
     // @Param: BUZZER_VOLUME
     // @DisplayName: Buzzer volume
     // @Description: Control the volume of the buzzer
@@ -220,7 +224,7 @@ const AP_Param::Info AP_Periph_FW::var_info[] = {
     GSCALAR(buzz_volume,     "BUZZER_VOLUME", 100),
 #endif
 
-#ifdef HAL_PERIPH_ENABLE_GPS
+#if AP_PERIPH_GPS_ENABLED
     // GPS driver
     // @Group: GPS
     // @Path: ../libraries/AP_GPS/AP_GPS.cpp
@@ -246,7 +250,7 @@ const AP_Param::Info AP_Periph_FW::var_info[] = {
 #endif
 #endif
 
-#ifdef HAL_PERIPH_ENABLE_BATTERY
+#if AP_PERIPH_BATTERY_ENABLED
     // @Group: BATT
     // @Path: ../libraries/AP_BattMonitor/AP_BattMonitor.cpp
     GOBJECT(battery_lib, "BATT", AP_BattMonitor),
@@ -259,13 +263,13 @@ const AP_Param::Info AP_Periph_FW::var_info[] = {
     GSCALAR(battery_hide_mask, "BATT_HIDE_MASK", HAL_PERIPH_BATT_HIDE_MASK_DEFAULT),
 #endif
 
-#ifdef HAL_PERIPH_ENABLE_MAG
+#if AP_PERIPH_MAG_ENABLED
     // @Group: COMPASS_
     // @Path: ../libraries/AP_Compass/AP_Compass.cpp
     GOBJECT(compass,         "COMPASS_",     Compass),
 #endif
 
-#ifdef HAL_PERIPH_ENABLE_BARO
+#if AP_PERIPH_BARO_ENABLED
     // Baro driver
     // @Group: BARO
     // @Path: ../libraries/AP_Baro/AP_Baro.cpp
@@ -290,14 +294,14 @@ const AP_Param::Info AP_Periph_FW::var_info[] = {
     GSCALAR(led_brightness, "LED_BRIGHTNESS", HAL_PERIPH_LED_BRIGHT_DEFAULT),
 #endif
 
-#ifdef HAL_PERIPH_ENABLE_AIRSPEED
+#if AP_PERIPH_AIRSPEED_ENABLED
     // Airspeed driver
     // @Group: ARSPD
     // @Path: ../libraries/AP_Airspeed/AP_Airspeed.cpp
     GOBJECT(airspeed, "ARSPD", AP_Airspeed),
 #endif
 
-#ifdef HAL_PERIPH_ENABLE_RANGEFINDER
+#if AP_PERIPH_RANGEFINDER_ENABLED
     // @Param: RNGFND_BAUDRATE
     // @DisplayName: Rangefinder serial baudrate
     // @Description: Rangefinder serial baudrate.
@@ -305,7 +309,7 @@ const AP_Param::Info AP_Periph_FW::var_info[] = {
     // @Increment: 1
     // @User: Standard
     // @RebootRequired: True
-    GSCALAR(rangefinder_baud, "RNGFND_BAUDRATE", HAL_PERIPH_RANGEFINDER_BAUDRATE_DEFAULT),
+    GARRAY(rangefinder_baud, 0, "RNGFND_BAUDRATE", HAL_PERIPH_RANGEFINDER_BAUDRATE_DEFAULT),
 
     // @Param: RNGFND_PORT
     // @DisplayName: Rangefinder Serial Port
@@ -314,7 +318,27 @@ const AP_Param::Info AP_Periph_FW::var_info[] = {
     // @Increment: 1
     // @User: Advanced
     // @RebootRequired: True
-    GSCALAR(rangefinder_port, "RNGFND_PORT", AP_PERIPH_RANGEFINDER_PORT_DEFAULT),
+    GARRAY(rangefinder_port, 0, "RNGFND_PORT", AP_PERIPH_RANGEFINDER_PORT_DEFAULT),
+
+#if RANGEFINDER_MAX_INSTANCES > 1
+    // @Param: RNGFND2_BAUDRATE
+    // @DisplayName: Rangefinder serial baudrate
+    // @Description: Rangefinder serial baudrate.
+    // @Values: 1:1200,2:2400,4:4800,9:9600,19:19200,38:38400,57:57600,111:111100,115:115200,230:230400,256:256000,460:460800,500:500000,921:921600,1500:1500000
+    // @Increment: 1
+    // @User: Standard
+    // @RebootRequired: True
+    GARRAY(rangefinder_baud, 1, "RNGFND2_BAUDRATE", HAL_PERIPH_RANGEFINDER_BAUDRATE_DEFAULT),
+
+    // @Param: RNGFND2_PORT
+    // @DisplayName: Rangefinder Serial Port
+    // @Description: This is the serial port number where SERIALx_PROTOCOL will be set to Rangefinder.
+    // @Range: 0 10
+    // @Increment: 1
+    // @User: Advanced
+    // @RebootRequired: True
+    GARRAY(rangefinder_port, 1, "RNGFND2_PORT", -1),
+#endif
 
     // @Param: RNGFND_MAX_RATE
     // @DisplayName: Rangefinder max rate
@@ -331,7 +355,7 @@ const AP_Param::Info AP_Periph_FW::var_info[] = {
     GOBJECT(rangefinder, "RNGFND", RangeFinder),
 #endif
 
-#ifdef HAL_PERIPH_ENABLE_ADSB
+#if AP_PERIPH_ADSB_ENABLED
     // @Param: ADSB_BAUDRATE
     // @DisplayName: ADSB serial baudrate
     // @Description: ADSB serial baudrate.
@@ -351,7 +375,7 @@ const AP_Param::Info AP_Periph_FW::var_info[] = {
     GSCALAR(adsb_port, "ADSB_PORT", HAL_PERIPH_ADSB_PORT_DEFAULT),
 #endif
 
-#ifdef HAL_PERIPH_ENABLE_PWM_HARDPOINT
+#if AP_PERIPH_PWM_HARDPOINT_ENABLED
     // @Param: HARDPOINT_ID
     // @DisplayName: Hardpoint ID
     // @Description: Hardpoint ID
@@ -368,7 +392,7 @@ const AP_Param::Info AP_Periph_FW::var_info[] = {
     GSCALAR(hardpoint_rate, "HARDPOINT_RATE", 100),
 #endif
 
-#if defined(HAL_PERIPH_ENABLE_HWESC) || defined(HAL_PERIPH_ENABLE_ESC_APD)
+#if AP_PERIPH_HOBBYWING_ESC_ENABLED || AP_PERIPH_ESC_APD_ENABLED
     // @Param: ESC_NUMBER
     // @DisplayName: ESC number
     // @Description: This is the ESC number to report as in UAVCAN ESC telemetry feedback packets.
@@ -377,11 +401,20 @@ const AP_Param::Info AP_Periph_FW::var_info[] = {
     GARRAY(esc_number, 0, "ESC_NUMBER", 0),
 #endif
 
-#ifdef HAL_PERIPH_ENABLE_RC_OUT
+#if AP_PERIPH_RC_OUT_ENABLED
     // Servo driver
     // @Group: OUT
     // @Path: ../libraries/SRV_Channel/SRV_Channels.cpp
     GOBJECT(servo_channels, "OUT",     SRV_Channels),
+
+    // @Param: ESC_RATE
+    // @DisplayName: ESC Update Rate
+    // @Description: Rate in Hz that ESC PWM outputs (function is MotorN) will update at
+    // @Units: Hz
+    // @Range: 50 400
+    // @Increment: 1
+    // @User: Advanced
+    GSCALAR(esc_rate, "ESC_RATE", 400), // effective Copter and QuadPlane default after clamping
 
     // @Param: ESC_PWM_TYPE
     // @DisplayName: Output PWM type
@@ -428,7 +461,7 @@ const AP_Param::Info AP_Periph_FW::var_info[] = {
     GOBJECT(temperature_sensor,         "TEMP",     AP_TemperatureSensor),
 #endif
 
-#ifdef HAL_PERIPH_ENABLE_MSP
+#if AP_PERIPH_MSP_ENABLED
     // @Param: MSP_PORT
     // @DisplayName: MSP Serial Port
     // @Description: This is the serial port number where SERIALx_PROTOCOL will be set to MSP
@@ -439,7 +472,7 @@ const AP_Param::Info AP_Periph_FW::var_info[] = {
     GSCALAR(msp_port, "MSP_PORT", AP_PERIPH_MSP_PORT_DEFAULT),
 #endif
     
-#ifdef HAL_PERIPH_ENABLE_NOTIFY
+#if AP_PERIPH_NOTIFY_ENABLED
     // @Group: NTF_
     // @Path: ../libraries/AP_Notify/AP_Notify.cpp
     GOBJECT(notify, "NTF_",  AP_Notify),
@@ -485,7 +518,7 @@ const AP_Param::Info AP_Periph_FW::var_info[] = {
     GOBJECT(node_stats, "STAT", AP_Stats),
 #endif
 
-#ifdef HAL_PERIPH_ENABLE_EFI
+#if AP_PERIPH_EFI_ENABLED
     // @Param: EFI_BAUDRATE
     // @DisplayName: EFI serial baudrate
     // @Description: EFI  serial baudrate.
@@ -510,7 +543,7 @@ const AP_Param::Info AP_Periph_FW::var_info[] = {
     GOBJECT(efi, "EFI", AP_EFI),
 #endif
 
-#ifdef HAL_PERIPH_ENABLE_PROXIMITY
+#if AP_PERIPH_PROXIMITY_ENABLED
     // @Param: PRX_BAUDRATE
     // @DisplayName: Proximity Sensor serial baudrate
     // @Description: Proximity Sensor serial baudrate.
@@ -542,7 +575,7 @@ const AP_Param::Info AP_Periph_FW::var_info[] = {
     // @Group: PRX
     // @Path: ../libraries/AP_Proximity/AP_Proximity.cpp
     GOBJECT(proximity, "PRX", AP_Proximity),
-#endif  // HAL_PERIPH_ENABLE_PROXIMITY
+#endif  // AP_PERIPH_PROXIMITY_ENABLED
 
 #if HAL_NMEA_OUTPUT_ENABLED
     // @Group: NMEA_
@@ -556,11 +589,11 @@ const AP_Param::Info AP_Periph_FW::var_info[] = {
     GOBJECT(kdecan, "KDE_",   AP_KDECAN),
 #endif
 
-#if defined(HAL_PERIPH_ENABLE_ESC_APD)
+#if AP_PERIPH_ESC_APD_ENABLED
     GARRAY(pole_count, 0, "ESC_NUM_POLES", 22),
 #endif
 
-#if defined(HAL_PERIPH_ENABLE_ESC_APD)
+#if AP_PERIPH_ESC_APD_ENABLED
     // @Param: ESC_APD_SERIAL_1
     // @DisplayName: ESC APD Serial 1
     // @Description: Which serial port to use for APD ESC data
@@ -586,31 +619,31 @@ const AP_Param::Info AP_Periph_FW::var_info[] = {
   #endif
 #endif
 
-#ifdef HAL_PERIPH_ENABLE_NETWORKING
+#if AP_PERIPH_NETWORKING_ENABLED
     // @Group: NET_
     // @Path: networking.cpp
     GOBJECT(networking_periph, "NET_", Networking_Periph),
 #endif
 
-#ifdef HAL_PERIPH_ENABLE_RPM
+#if AP_PERIPH_RPM_ENABLED
     // @Group: RPM
     // @Path: ../libraries/AP_RPM/AP_RPM.cpp
     GOBJECT(rpm_sensor, "RPM", AP_RPM),
 #endif
 
-#ifdef HAL_PERIPH_ENABLE_RCIN
+#if AP_PERIPH_RCIN_ENABLED
     // @Group: RC
     // @Path: rc_in.cpp
     GOBJECT(g_rcin, "RC",  Parameters_RCIN),
 #endif
 
-#ifdef HAL_PERIPH_ENABLE_BATTERY_BALANCE
+#if AP_PERIPH_BATTERY_BALANCE_ENABLED
     // @Group: BAL
     // @Path: batt_balance.cpp
     GOBJECT(battery_balance, "BAL",  BattBalance),
 #endif
 
-#ifdef HAL_PERIPH_ENABLE_SERIAL_OPTIONS
+#if AP_PERIPH_SERIAL_OPTIONS_ENABLED
     // @Group: UART
     // @Path: serial_options.cpp
     GOBJECT(serial_options, "UART",  SerialOptions),
@@ -638,19 +671,19 @@ const AP_Param::Info AP_Periph_FW::var_info[] = {
     GSCALAR(can_mirror_ports, "CAN_MIRROR_PORTS", 0),
 #endif // HAL_PERIPH_CAN_MIRROR
 
-#ifdef HAL_PERIPH_ENABLE_RTC
+#if AP_PERIPH_RTC_ENABLED
     // @Group: RTC
     // @Path: ../libraries/AP_RTC/AP_RTC.cpp
     GOBJECT(rtc,                   "RTC",    AP_RTC),
 #endif
 
-#ifdef HAL_PERIPH_ENABLE_RELAY
+#if AP_PERIPH_RELAY_ENABLED
     // @Group: RELAY
     // @Path: ../libraries/AP_Relay/AP_Relay.cpp
     GOBJECT(relay,                 "RELAY", AP_Relay),
 #endif
 
-#ifdef HAL_PERIPH_ENABLE_DEVICE_TEMPERATURE
+#if AP_PERIPH_DEVICE_TEMPERATURE_ENABLED
     // @Param: TEMP_MSG_RATE
     // @DisplayName: Temperature sensor message rate
     // @Description: This is the rate Temperature sensor data is sent in Hz. Zero means no send. Each sensor with source DroneCAN is sent in turn.
@@ -659,6 +692,49 @@ const AP_Param::Info AP_Periph_FW::var_info[] = {
     // @Increment: 1
     // @User: Standard
     GSCALAR(temperature_msg_rate, "TEMP_MSG_RATE", 0),
+#endif
+
+    // @Param: OPTIONS
+    // @DisplayName: AP Periph Options
+    // @Description: Bitmask of AP Periph Options
+    // @Bitmask: 0: Enable continuous sensor probe
+    // @User: Standard
+    GSCALAR(options, "OPTIONS", AP_PERIPH_PROBE_CONTINUOUS),
+
+#if AP_PERIPH_RPM_STREAM_ENABLED
+    // @Param: RPM_MSG_RATE
+    // @DisplayName: RPM sensor message rate
+    // @Description: This is the rate RPM sensor data is sent in Hz. Zero means no send. Each sensor with a set ID is sent in turn.
+    // @Units: Hz
+    // @Range: 0 200
+    // @Increment: 1
+    // @User: Standard
+    GSCALAR(rpm_msg_rate, "RPM_MSG_RATE", 0),
+#endif
+
+#if AP_EXTENDED_ESC_TELEM_ENABLED && HAL_WITH_ESC_TELEM
+    // @Param: ESC_EXT_TLM_RATE
+    // @DisplayName: ESC Extended telemetry message rate
+    // @Description: This is the rate at which extended ESC Telemetry will be sent across the CAN bus for each ESC
+    // @Units: Hz
+    // @Range: 0 50
+    // @Increment: 1
+    // @User: Advanced
+    GSCALAR(esc_extended_telem_rate, "ESC_EXT_TLM_RATE", AP_PERIPH_ESC_TELEM_RATE_DEFAULT / 10),
+#endif
+
+
+#if AP_PERIPH_IMU_ENABLED
+    // @Param: IMU_SAMPLE_RATE
+    // @DisplayName: IMU Sample Rate
+    // @Description: IMU Sample Rate
+    // @Range: 0 1000
+    // @User: Standard
+    GSCALAR(imu_sample_rate, "INS_SAMPLE_RATE", 0),
+
+    // @Group: INS
+    // @Path: ../libraries/AP_InertialSensor/AP_InertialSensor.cpp
+    GOBJECT(imu, "INS", AP_InertialSensor),
 #endif
 
     AP_VAREND

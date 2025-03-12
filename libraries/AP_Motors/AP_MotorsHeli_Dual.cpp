@@ -248,14 +248,6 @@ void AP_MotorsHeli_Dual::calculate_armed_scalars()
         _main_rotor._rsc_mode.save();
         _heliflags.save_rsc_mode = false;
     }
-
-    if (_heliflags.in_autorotation) {
-        _main_rotor.set_autorotation_flag(_heliflags.in_autorotation);
-        // set bailout ramp time
-        _main_rotor.use_bailout_ramp_time(_heliflags.enable_bailout);
-    }else { 
-        _main_rotor.set_autorotation_flag(false);
-    }
 }
 
 // calculate_scalars
@@ -374,7 +366,8 @@ void AP_MotorsHeli_Dual::update_motor_control(AP_MotorsHeli_RSC::RotorControlSta
     }
 
     // Check if rotors are run-up
-    _heliflags.rotor_runup_complete = _main_rotor.is_runup_complete();
+    set_rotor_runup_complete(_main_rotor.is_runup_complete());
+
     // Check if rotors are spooled down
     _heliflags.rotor_spooldown_complete = _main_rotor.is_spooldown_complete();
 }
@@ -403,7 +396,8 @@ void AP_MotorsHeli_Dual::move_actuators(float roll_out, float pitch_out, float c
             pitch_out = _cyclic_max/4500.0f;
             limit.pitch = true;
         }
-    } else {
+    }
+    if (_dual_mode != AP_MOTORS_HELI_DUAL_MODE_TRANSVERSE) {
         if (roll_out < -_cyclic_max/4500.0f) {
             roll_out = -_cyclic_max/4500.0f;
             limit.roll = true;
@@ -433,11 +427,7 @@ void AP_MotorsHeli_Dual::move_actuators(float roll_out, float pitch_out, float c
     }
 
     // updates below land min collective flag
-    if (collective_out <= _collective_land_min_pct) {
-        _heliflags.below_land_min_coll = true;
-    } else {
-        _heliflags.below_land_min_coll = false;
-    }
+    _heliflags.below_land_min_coll = !is_positive(collective_out - _collective_land_min_pct);
 
     // updates takeoff collective flag based on 50% hover collective
     update_takeoff_collective_flag(collective_out);
@@ -593,3 +583,16 @@ bool AP_MotorsHeli_Dual::arming_checks(size_t buflen, char *buffer) const
 
     return true;
 }
+
+#if HAL_LOGGING_ENABLED
+// heli motors logging - called at 10 Hz
+void AP_MotorsHeli_Dual::Log_Write(void)
+{
+    // write swashplate log
+    _swashplate1.write_log(get_cyclic_angle_scaler(), _collective_min_deg.get(), _collective_max_deg.get(), _collective_min.get(), _collective_max.get());
+    _swashplate2.write_log(get_cyclic_angle_scaler(), _collective_min_deg.get(), _collective_max_deg.get(), _collective2_min.get(), _collective2_max.get());
+
+    // write RSC log
+    _main_rotor.write_log();
+}
+#endif
