@@ -833,6 +833,8 @@ def start_vehicle(binary, opts, stuff, spawns=None):
         cmd.append("--start-time=%d" % start_time_UTC)
 
     cmd.append("--sim-address=%s" % cmd_opts.sim_address)
+    if cmd_opts.enable_fgview:
+        cmd.append("--enable-fgview")
 
     old_dir = os.getcwd()
     for i, i_dir in zip(instances, instance_dir):
@@ -1332,6 +1334,10 @@ group_sim.add_option("", "--sim-address",
                      type=str,
                      default="127.0.0.1",
                      help="IP address of the simulator. Defaults to localhost")
+group_sim.add_option("--enable-fgview",
+                     default=False,
+                     action='store_true',
+                     help="Enable FlightGear view")
 group_sim.add_option("--enable-dds", action='store_true',
                      help="Enable the dds client to connect with ROS2/DDS")
 group_sim.add_option("--disable-networking", action='store_true',
