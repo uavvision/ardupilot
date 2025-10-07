@@ -192,7 +192,8 @@ bool NavEKF3_core::setLatLng(const Location &loc, float posAccuracy, uint32_t ti
 {
     if ((imuSampleTime_ms - lastGpsPosPassTime_ms) < frontend->deadReckonDeclare_ms ||
         (PV_AidingMode == AID_NONE)
-        || !validOrigin) {
+        || !validOrigin
+        || AP::gps().disabled()) {
         return false;
     }
 

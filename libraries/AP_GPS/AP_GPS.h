@@ -294,6 +294,10 @@ public:
         return status(primary_instance);
     }
 
+    bool disabled(void) const {
+        return _force_disable_gps;
+    }
+
     // return a single human-presentable character representing the
     // fix type.  For space-constrained human-readable displays
     char status_onechar(void) const {
