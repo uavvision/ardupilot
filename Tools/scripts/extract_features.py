@@ -242,6 +242,7 @@ class ExtractFeatures(object):
             ('FORCE_APJ_DEFAULT_PARAMETERS', 'AP_Param::param_defaults_data'),
             ('HAL_BUTTON_ENABLED', 'AP_Button::update'),
             ('HAL_LOGGING_ENABLED', 'AP_Logger::Init'),
+            ('AP_MAVLINK_MSG_GNSS_INTEGRITY_ENABLED', 'AP_GPS::send_mavlink_gnss_integrity'),
         ]
 
     def progress(self, msg):
