@@ -554,13 +554,13 @@ AP_GPS_SBF::process_message(void)
         check_new_itow(temp.TOW, sbf_msg.length);
         RxState = temp.RxState;
         if ((RxError & RX_ERROR_MASK) != (temp.RxError & RX_ERROR_MASK)) {
-            GCS_SEND_TEXT(MAV_SEVERITY_INFO, "GPS %u: SBF internal error changed (0x%08x/0x%08x)", (unsigned int)(state.instance + 1),
-                            (unsigned int)(RxError & RX_ERROR_MASK), (unsigned int)(temp.RxError & RX_ERROR_MASK));
+            // GCS_SEND_TEXT(MAV_SEVERITY_INFO, "GPS %u: SBF internal error changed (0x%08x/0x%08x)", (unsigned int)(state.instance + 1),
+            //                 (unsigned int)(RxError & RX_ERROR_MASK), (unsigned int)(temp.RxError & RX_ERROR_MASK));
         }
         RxError = temp.RxError;
         if ((ExtError & EXT_ERROR_MASK) != (temp.ExtError & EXT_ERROR_MASK)) {
-            GCS_SEND_TEXT(MAV_SEVERITY_INFO, "GPS %u: SBF external error changed (0x%08x/0x%08x)", (unsigned int)(state.instance + 1),
-                            (unsigned int)(ExtError & EXT_ERROR_MASK), (unsigned int)(temp.ExtError & EXT_ERROR_MASK));
+            // GCS_SEND_TEXT(MAV_SEVERITY_INFO, "GPS %u: SBF external error changed (0x%08x/0x%08x)", (unsigned int)(state.instance + 1),
+            //                 (unsigned int)(ExtError & EXT_ERROR_MASK), (unsigned int)(temp.ExtError & EXT_ERROR_MASK));
         }
         ExtError = temp.ExtError;
 #if AP_MAVLINK_MSG_GNSS_INTEGRITY_ENABLED
