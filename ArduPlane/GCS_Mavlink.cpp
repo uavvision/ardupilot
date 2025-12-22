@@ -698,9 +698,6 @@ static const ap_message STREAM_EXTRA3_msgs[] = {
 #endif
     MSG_EKF_STATUS_REPORT,
     MSG_VIBRATION,
-#if AP_MAVLINK_MSG_GNSS_INTEGRITY_ENABLED
-    MSG_GNSS_INTEGRITY,
-#endif  // AP_MAVLINK_MSG_GNSS_INTEGRITY_ENABLED
 };
 static const ap_message STREAM_PARAMS_msgs[] = {
     MSG_NEXT_PARAM
