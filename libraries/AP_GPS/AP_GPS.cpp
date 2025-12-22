@@ -1351,18 +1351,6 @@ void AP_GPS::handle_msg(mavlink_channel_t chan, const mavlink_message_t &msg)
     case MAVLINK_MSG_ID_GPS_INJECT_DATA:
         handle_gps_inject(msg);
         break;
-    case MAVLINK_MSG_ID_GPS_INPUT: {
-        mavlink_gps_input_t packet;
-        mavlink_msg_gps_input_decode(&msg, &packet);
-
-        if (packet.gps_id >= GPS_MAX_RECEIVERS || _type[packet.gps_id] != GPS_TYPE_MAV) {
-            // invalid instance
-            break;
-        }
-        drivers[packet.gps_id]->handle_msg(msg);
-
-        break;
-    }
     default: {
         uint8_t i;
         for (i=0; i<num_instances; i++) {
