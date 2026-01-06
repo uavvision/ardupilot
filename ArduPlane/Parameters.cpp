@@ -203,6 +203,15 @@ const AP_Param::Info Plane::var_info[] = {
     // @User: Advanced
     GSCALAR(takeoff_flap_percent,     "TKOFF_FLAP_PCNT", 0),
 
+    // @Param: TKOFF_THR_IDLE
+    // @DisplayName: Takeoff idle throttle
+    // @Description: The idle throttle to hold after arming and before a takeoff. Applicable in TAKEOFF and AUTO modes.
+    // @Units: %
+    // @Range: 0 100
+    // @Increment: 1
+    // @User: Standard
+    ASCALAR(takeoff_throttle_idle,       "TKOFF_THR_IDLE",    0),
+
     // @Param: LEVEL_ROLL_LIMIT
     // @DisplayName: Level flight roll limit
     // @Description: This controls the maximum bank angle in degrees during flight modes where level flight is desired, such as in the final stages of landing, and during auto takeoff. This should be a small angle (such as 5 degrees) to prevent a wing hitting the runway during takeoff or landing. Setting this to zero will completely disable heading hold on auto takeoff while below 5 meters and during the flare portion of a final landing approach.
