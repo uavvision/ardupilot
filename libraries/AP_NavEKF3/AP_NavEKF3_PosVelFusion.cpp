@@ -190,7 +190,7 @@ void NavEKF3_core::ResetPosition(resetDataSource posResetSource)
 // Returns true if the set was successful
 bool NavEKF3_core::setLatLng(const Location &loc, float posAccuracy, uint32_t timestamp_ms)
 {
-   if ((imuSampleTime_ms - lastPosPassTime_ms) < frontend->deadReckonDeclare_ms ||
+    if ((imuSampleTime_ms - lastGpsPosPassTime_ms) < frontend->deadReckonDeclare_ms ||
            (PV_AidingMode == AID_NONE)
            || !validOrigin
            || AP::gps().disabled()) {
