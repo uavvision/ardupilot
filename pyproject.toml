@@ -1,3 +1,37 @@
+[project]
+name = "ardupilot-env"
+version = "0.1.0"
+description = "ArduPilot build and SITL simulation environment"
+readme = "README.md"
+requires-python = ">=3.10, <3.12"
+dependencies = [
+    "attrdict3>=0.1.0",
+    "dronecan>=1.0.0",
+    "empy==3.3.4",
+    "flake8>=6.0.0",
+    "geocoder>=1.38.0",
+    "intelhex>=2.3.0",
+    "junitparser>=3.0.0",
+    "lxml>=4.9.0",
+    "matplotlib>=3.5.0",
+    "mavproxy>=1.8.0",
+    "numpy>=1.20.0",
+    "opencv-python>=4.5.0",
+    "packaging>=23.0",
+    "pexpect>=4.8.0",
+    "psutil>=5.9.0",
+    "ptyprocess>=0.7.0",
+    "pymavlink>=2.4.0",
+    "pyparsing>=3.0.0",
+    "pygame>=2.1.0",
+    "pyserial>=3.5",
+    "pyyaml>=6.0",
+    "scipy>=1.8.0",
+    "wxpython>=4.2.0",
+]
+# Download, unpack and add bin dir to PATH https://firmware.ardupilot.org/Tools/STM32-tools/gcc-arm-none-eabi-10-2020-q4-major-x86_64-linux.tar.bz2
+# seems to be required even for SITL
+
 [tool.isort]
 profile = "black"
 skip = ["./modules/", "./build/"]
