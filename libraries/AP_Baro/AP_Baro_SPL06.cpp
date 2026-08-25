@@ -170,6 +170,7 @@ bool AP_Baro_SPL06::_init()
     uint8_t buf[SPL06_CALIB_COEFFS_LEN];
 
 #define READ_LENGTH 9
+
     for (uint8_t i = 0; i < ARRAY_SIZE(buf); ) {
         ssize_t chunk = MIN(READ_LENGTH, SPL06_CALIB_COEFFS_LEN - i);
         if (!_dev->read_registers(SPL06_REG_CALIB_COEFFS_START + i, buf + i, chunk)) {
@@ -177,20 +178,6 @@ bool AP_Baro_SPL06::_init()
         }
         i += chunk;
     }
-
-    _c0 = (buf[0] & 0x80 ? 0xF000 : 0) | ((uint16_t)buf[0] << 4) | (((uint16_t)buf[1] & 0xF0) >> 4);
-    _c1 = ((buf[1] & 0x8 ? 0xF000 : 0) | ((uint16_t)buf[1] & 0x0F) << 8) | (uint16_t)buf[2];
-    _c00 = (buf[3] & 0x80 ? 0xFFF00000 : 0) | ((uint32_t)buf[3] << 12) | ((uint32_t)buf[4] << 4) | (((uint32_t)buf[5] & 0xF0) >> 4);
-    _c10 = (buf[5] & 0x8 ? 0xFFF00000 : 0) | (((uint32_t)buf[5] & 0x0F) << 16) | ((uint32_t)buf[6] << 8) | (uint32_t)buf[7];
-    _c01 = ((uint16_t)buf[8] << 8) | ((uint16_t)buf[9]);
-    _c11 = ((uint16_t)buf[10] << 8) | (uint16_t)buf[11];
-    _c20 = ((uint16_t)buf[12] << 8) | (uint16_t)buf[13];
-    _c21 = ((uint16_t)buf[14] << 8) | (uint16_t)buf[15];
-    _c30 = ((uint16_t)buf[16] << 8) | (uint16_t)buf[17];
-    if(type == Type::SPA06) {
-		_c31 = (buf[18] & 0x80 ? 0xF000 : 0) | ((uint16_t)buf[18] << 4) | (((uint16_t)buf[19] & 0xF0) >> 4);
-		_c40 = ((buf[19] & 0x8 ? 0xF000 : 0) | ((uint16_t)buf[19] & 0x0F) << 8) | (uint16_t)buf[20];
-	}
 
     // 0x11 c0 [3:0] + 0x10 c0 [11:4]
     _c0 = get_twos_complement(((uint32_t)buf[0] << 4) | (((uint32_t)buf[1] >> 4) & 0x0F), 12);

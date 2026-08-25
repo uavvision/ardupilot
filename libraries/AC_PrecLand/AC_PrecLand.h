@@ -233,8 +233,8 @@ private:
     Vector2f                    _target_vel_rel_est_ne_ms;          // target's velocity relative to the IMU, not compensated for lag
 
     Vector2f                    _target_pos_rel_out_ne_m;   // target's position relative to the camera, fed into position controller
-    Vector2f                    _target_vel_rel_out_ne_ms; // target's velocity relative to the CG, fed into position controller
-    Vector3f                    _last_veh_velocity_NED_ms; // AHRS velocity at last estimate
+    Vector2f                    _target_vel_rel_out_ne_ms;  // target's velocity relative to the CG, fed into position controller
+    Vector3f                    _last_veh_velocity_NED_ms;  // AHRS velocity at last estimate
 
     TargetState                 _current_target_state;      // Current status of the landing target
 

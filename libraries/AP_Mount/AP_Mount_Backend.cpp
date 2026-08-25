@@ -157,7 +157,7 @@ void AP_Mount_Backend::update_mnt_target_from_rc_target()
 void AP_Mount_Backend::adjust_mnt_target_if_RP_locked()
 {
      // retrieve lean angles from ahrs
-    const AP_AHRS &ahrs = AP::ahrs();
+    const AP_AHRS &ahrs = AP::ahrs(); 
     Vector2f ahrs_angle_rad = {ahrs.get_roll_rad(), ahrs.get_pitch_rad()};
 
     // rotate ahrs roll and pitch angles to gimbal yaw
@@ -165,14 +165,14 @@ void AP_Mount_Backend::adjust_mnt_target_if_RP_locked()
         const float yaw_bf_rad = constrain_float(mnt_target.angle_rad.get_bf_yaw(), radians(_params.yaw_angle_min), radians(_params.yaw_angle_max));
         ahrs_angle_rad.rotate(yaw_bf_rad);
     }
-
+    
     // remove roll and pitch lean angle to correct to body frame
     if (!mnt_target.angle_rad.roll_is_ef){
         mnt_target.angle_rad.roll += ahrs_angle_rad.x;
     }
     if (!mnt_target.angle_rad.pitch_is_ef){
         mnt_target.angle_rad.pitch += ahrs_angle_rad.y;
-    }
+    } 
 }
 
 // set angle target in degrees
@@ -850,7 +850,7 @@ bool AP_Mount_Backend::calculate_poi_at_home_alt(Location &target_location)
     // for the purpose of selecting a forward point in the home-alt plane.
     const bool used_mirror = (target_down_m < 0.0f);
     const float effective_down_m = used_mirror ? -target_down_m : target_down_m;
-
+    
     // guaranteed positive with min_los_z check
     const float t_m = effective_down_m / los_ned.z;
 
@@ -1083,7 +1083,7 @@ uint16_t AP_Mount_Backend::get_gimbal_device_flags() const
             break;
         case MountTargetType::LOCATION:
             yaw_lock_state = true;
-            break;
+            break;        
         }
         break;
     case MAV_MOUNT_MODE_RC_TARGETING:
@@ -1149,7 +1149,7 @@ void AP_Mount_Backend::update_mnt_target()
 
 // method for the mount backends to update mnt_target based on
 // the mount mode.  Methods in here may be overridden by the derived
-// class to customise behaviour
+// class to customise behaviour    
 void AP_Mount_Backend::_update_mnt_target()
 {
     // change to RC_TARGETING mode if RC input has changed
@@ -1212,7 +1212,7 @@ void AP_Mount_Backend::_update_mnt_target()
 
 void AP_Mount_Backend::send_target_to_gimbal()
 {
-    // process any pending clear-roi-target
+    // process any pending clear-roi-target 
     // it is assumed that we have already zeroed _roi_target
     if (clear_roi_pending && natively_supports(MountTargetType::LOCATION)) {
         clear_roi_pending = false;

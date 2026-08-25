@@ -990,7 +990,6 @@ Copter::Copter(void)
     land_accel_ef_filter(LAND_DETECTOR_ACCEL_LPF_CUTOFF),
     rc_throttle_control_in_filter(1.0f),
     param_loader(var_info)
-    // MIGRATION4.7.0:   hgt_variance_filt(FS_EKF_FILT_DEFAULT)     inertial_nav(ahrs),
 {
 }
 

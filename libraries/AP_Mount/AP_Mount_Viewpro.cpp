@@ -21,7 +21,7 @@ extern const AP_HAL::HAL& hal;
 #define AP_MOUNT_VIEWPRO_HEALTH_TIMEOUT_MS 1000 // state will become unhealthy if no attitude is received within this timeout
 #define AP_MOUNT_VIEWPRO_UPDATE_INTERVAL_MS 100 // resend angle or rate targets to gimbal at this interval
 #define AP_MOUNT_VIEWPRO_EO_ZOOM_SPEED     0x07    // hard-coded zoom speed (fast)
-#define AP_MOUNT_VIEWPRO_IR_ZOOM_SPEED     1
+#define AP_MOUNT_VIEWPRO_IR_ZOOM_SPEED     1 
 #define AP_MOUNT_VIEWPRO_ZOOM_MAX       10      // hard-coded absolute zoom times max
 #define AP_MOUNT_VIEWPRO_DEG_TO_OUTPUT  (65536.0 / 360.0)   // scalar to convert degrees to the viewpro angle scaling
 #define AP_MOUNT_VIEWPRO_OUTPUT_TO_DEG  (360.0 / 65536.0)   // scalar to convert viewpro angle scaling to degrees
@@ -295,7 +295,7 @@ void AP_Mount_Viewpro::process_packet()
         }
 
         switch (_image_sensor) {
-            default:
+            default:   
             case ImageSensor::EO1:
             case ImageSensor::EO1_IR_PIP:
                 //optical zoom times
@@ -306,7 +306,7 @@ void AP_Mount_Viewpro::process_packet()
                 //ir zoom times
                 _zoom_times = ((_msg_buff[_msg_buff_data_start+29] >> 3) & 0x0F) + 1;
                 break;
-        }
+        }        
         // get laser rangefinder distance
         _rangefinder_dist_m = UINT16_VALUE(_msg_buff[_msg_buff_data_start+33], _msg_buff[_msg_buff_data_start+34]) * 0.1;
         break;
@@ -700,9 +700,9 @@ bool AP_Mount_Viewpro::set_zoom(ZoomType zoom_type, float zoom_value)
     if (zoom_type == ZoomType::RATE) {
         uint8_t zoom_speed = 1;
         CameraCommand zoom_cmd = CameraCommand::STOP_FOCUS_AND_ZOOM;
-
+        
         switch (_image_sensor) {
-            default:
+            default:   
             case ImageSensor::EO1:
             case ImageSensor::EO1_IR_PIP:
                 if (zoom_value < 0) {
@@ -720,9 +720,9 @@ bool AP_Mount_Viewpro::set_zoom(ZoomType zoom_type, float zoom_value)
                     zoom_cmd = CameraCommand::IR_ZOOM_OUT;
                 }
                 zoom_speed = AP_MOUNT_VIEWPRO_IR_ZOOM_SPEED;
-                break;
+                break;    
         }
-
+        
         return send_camera_command(_image_sensor, zoom_cmd, zoom_speed);
     }
 
@@ -818,47 +818,6 @@ bool AP_Mount_Viewpro::set_lens(uint8_t lens)
 
     // if lens is zero use default lens
     ImageSensor new_image_sensor = ImageSensor(lens);
-    return send_camera_command(new_image_sensor, CameraCommand::NO_ACTION, 0);
-}
-
-// set_camera_source is functionally the same as set_lens except primary and secondary lenses are specified by type
-// primary and secondary sources use the AP_Camera::CameraSource enum cast to uint8_t
-bool AP_Mount_Viewpro::set_camera_source(uint8_t primary_source, uint8_t secondary_source)
-{
-    // maps primary and secondary source to viewpro image sensor
-    ImageSensor new_image_sensor;
-    switch (primary_source) {
-    case 0: // Default (RGB)
-        FALLTHROUGH;
-    case 1: // RGB
-        switch (secondary_source) {
-        case 0: // RGB + Default (None)
-            new_image_sensor = ImageSensor::EO1;
-            break;
-        case 2: // PIP RGB+IR
-            new_image_sensor = ImageSensor::EO1_IR_PIP;
-            break;
-        default:
-            return false;
-        }
-        break;
-    case 2: // IR
-        switch (secondary_source) {
-        case 0: // IR + Default (None)
-            new_image_sensor = ImageSensor::IR;
-            break;
-        case 1: // PIP IR+RGB
-            new_image_sensor = ImageSensor::IR_EO1_PIP;
-            break;
-        default:
-            return false;
-        }
-        break;
-    default:
-        return false;
-    }
-
-    // send desired image type to camera
     return send_camera_command(new_image_sensor, CameraCommand::NO_ACTION, 0);
 }
 

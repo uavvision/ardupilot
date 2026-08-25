@@ -689,7 +689,6 @@ bool AP_ExternalAHRS_InertialLabs::check_uart()
 #if HAL_LOGGING_ENABLED
         uint64_t now_us = AP_HAL::micros64();
 
-// MIGRATION4.7.0: it aws ILB1+
         // @LoggerMessage: ILB7
         // @Description: InertialLabs AHRS data7
         // @Field: TimeUS: Time since system startup
@@ -718,7 +717,6 @@ bool AP_ExternalAHRS_InertialLabs::check_uart()
                                     state2.unit_status, state2.unit_status2,
                                     state2.supply_voltage);
 
-// MIGRATION4.7.0: It was ILB2+
         // @LoggerMessage: ILB8
         // @Description: InertialLabs AHRS data8
         // @Field: TimeUS: Time since system startup

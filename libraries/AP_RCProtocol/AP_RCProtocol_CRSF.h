@@ -30,12 +30,6 @@
 #include "SoftSerial.h"
 #include <AP_OSD/AP_OSD_config.h>
 
-// MIGRATION4.7.0: potentially dead code
-#define CRSF_MAX_CHANNELS   24U      // Maximum number of channels from crsf datastream
-#define CRSF_FRAMELEN_MAX   64U      // maximum possible framelength
-#define CRSF_HEADER_LEN     2U       // header length
-#define CRSF_FRAME_PAYLOAD_MAX (CRSF_FRAMELEN_MAX - CRSF_HEADER_LEN)     // maximum size of the frame length field in a packet
-
 #define CRSF_FRAME_LENGTH_MIN 2 // min value for _frame.length
 #define CRSF_BAUDRATE      416666U
 #define ELRS_BAUDRATE      420000U
@@ -166,7 +160,7 @@ public:
         ELRS_RF_MODE_150HZ,
         ELRS_RF_MODE_200HZ,
         ELRS_RF_MODE_250HZ,
-        ELRS_RF_MODE_333HZ_FULL,
+        ELRS_RF_MODE_333HZ_FULL,        
         ELRS_RF_MODE_500HZ,
         ELRS_RF_MODE_D250HZ,
         ELRS_RF_MODE_D500HZ,
@@ -179,7 +173,7 @@ public:
 
 #if AP_OSD_LINK_STATS_EXTENSIONS_ENABLED
     // These power levels are valid for both Crossfire and ELRS systems
-    static constexpr uint16_t tx_powers[] = { 0, 10, 25, 100, 500, 1000, 2000, 250, 50 };
+    static constexpr uint16_t tx_powers[] = { 0, 10, 25, 100, 500, 1000, 2000, 250, 50 };    
 #endif
 
     struct LinkStatus {

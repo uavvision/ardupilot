@@ -114,10 +114,6 @@
 # define FS_EKF_FILT_DEFAULT     5.0f    // frequency cutoff of EKF variance filters
 #endif
 
-#ifndef FS_EKF_FILT_DEFAULT
-# define FS_EKF_FILT_DEFAULT     5.0f    // frequency cutoff of EKF variance filters
-#endif
-
 //////////////////////////////////////////////////////////////////////////////
 //  Auto Tuning
 #ifndef AUTOTUNE_ENABLED

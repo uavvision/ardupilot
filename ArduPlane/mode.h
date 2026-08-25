@@ -158,9 +158,9 @@ public:
 
     // true if voltage correction should be applied to throttle
     virtual bool use_battery_compensation() const;
-
-#if MODE_AUTOLAND_ENABLED
-    // true if mode allows landing direction to be set on first takeoff after arm in this mode
+ 
+#if MODE_AUTOLAND_ENABLED   
+    // true if mode allows landing direction to be set on first takeoff after arm in this mode 
     virtual bool allows_autoland_direction_capture() const { return false; }
 #endif
 
@@ -230,8 +230,8 @@ public:
 
     void stabilize_quaternion();
 
-#if MODE_AUTOLAND_ENABLED
-    // true if mode allows landing direction to be set on first takeoff after arm in this mode
+#if MODE_AUTOLAND_ENABLED   
+    // true if mode allows landing direction to be set on first takeoff after arm in this mode 
     bool allows_autoland_direction_capture() const override { return true; }
 #endif
 
@@ -285,8 +285,8 @@ public:
 
     void run() override;
 
-#if MODE_AUTOLAND_ENABLED
-    // true if mode allows landing direction to be set on first takeoff after arm in this mode
+#if MODE_AUTOLAND_ENABLED   
+    // true if mode allows landing direction to be set on first takeoff after arm in this mode 
     bool allows_autoland_direction_capture() const override { return true; }
 #endif
 
@@ -341,11 +341,11 @@ public:
 
     void run() override;
 
-#if MODE_AUTOLAND_ENABLED
-    // true if mode allows landing direction to be set on first takeoff after arm in this mode
+#if MODE_AUTOLAND_ENABLED   
+    // true if mode allows landing direction to be set on first takeoff after arm in this mode 
     bool allows_autoland_direction_capture() const override { return true; }
 #endif
-
+    
 protected:
 
     bool _enter() override;
@@ -507,8 +507,8 @@ public:
     // true if voltage correction should be applied to throttle
     bool use_battery_compensation() const override { return false; }
 
-#if MODE_AUTOLAND_ENABLED
-    // true if mode allows landing direction to be set on first takeoff after arm in this mode
+#if MODE_AUTOLAND_ENABLED   
+    // true if mode allows landing direction to be set on first takeoff after arm in this mode 
     bool allows_autoland_direction_capture() const override { return true; }
 #endif
 
@@ -558,8 +558,8 @@ public:
 
     void run() override;
 
-#if MODE_AUTOLAND_ENABLED
-    // true if mode allows landing direction to be set on first takeoff after arm in this mode
+#if MODE_AUTOLAND_ENABLED   
+    // true if mode allows landing direction to be set on first takeoff after arm in this mode 
     bool allows_autoland_direction_capture() const override { return true; }
 #endif
 
@@ -581,8 +581,8 @@ public:
 
     void run() override;
 
-#if MODE_AUTOLAND_ENABLED
-    // true if mode allows landing direction to be set on first takeoff after arm in this mode
+#if MODE_AUTOLAND_ENABLED   
+    // true if mode allows landing direction to be set on first takeoff after arm in this mode 
     bool allows_autoland_direction_capture() const override { return true; }
 #endif
 };
@@ -629,8 +629,8 @@ public:
     bool supports_fw_systemid() const override { return true; }
 #endif
 
-#if MODE_AUTOLAND_ENABLED
-    // true if mode allows landing direction to be set on first takeoff after arm in this mode
+#if MODE_AUTOLAND_ENABLED   
+    // true if mode allows landing direction to be set on first takeoff after arm in this mode 
     bool allows_autoland_direction_capture() const override { return true; }
 #endif
 
@@ -749,7 +749,7 @@ public:
     // does this mode support quadplane vtol systemid?
     bool supports_vtol_systemid() const override { return true; }
 #endif
-
+    
 protected:
 private:
 
@@ -778,7 +778,7 @@ public:
     // does this mode support quadplane vtol systemid?
     bool supports_vtol_systemid() const override { return true; }
 #endif
-
+    
 protected:
 
     bool _enter() override;
@@ -811,7 +811,7 @@ public:
     // does this mode support quadplane vtol systemid?
     bool supports_vtol_systemid() const override { return true; }
 #endif
-
+    
 protected:
 
     bool _enter() override;
@@ -946,8 +946,8 @@ public:
 
     bool does_auto_throttle() const override { return true; }
 
-#if MODE_AUTOLAND_ENABLED
-    // true if mode allows landing direction to be set on first takeoff after arm in this mode
+#if MODE_AUTOLAND_ENABLED   
+    // true if mode allows landing direction to be set on first takeoff after arm in this mode 
     bool allows_autoland_direction_capture() const override { return true; }
 #endif
 
@@ -993,9 +993,9 @@ public:
     bool does_auto_navigation() const override { return true; }
 
     bool does_auto_throttle() const override { return true; }
-
+    
     bool is_landing() const override;
-
+    
     void check_takeoff_direction(void);
 
     // return true when lined up correctly from the LOITER_TO_ALT

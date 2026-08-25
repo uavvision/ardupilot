@@ -1141,7 +1141,7 @@ bool AP_Arming::system_checks(bool report)
             check_failed(Check::PARAMETERS, report, "parameter storage full");
             return false;
         }
-
+        
         // check main loop rate is at least 90% of expected value
         const float actual_loop_rate = AP::scheduler().get_filtered_loop_rate_hz();
         const uint16_t expected_loop_rate = AP::scheduler().get_loop_rate_hz();
@@ -1383,7 +1383,7 @@ bool AP_Arming::fence_checks(bool display_failure)
         return false;
     }
 #endif
-
+    
     return false;
 }
 #endif  // AP_FENCE_ENABLED

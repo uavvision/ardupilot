@@ -321,10 +321,10 @@ protected:
 
     // called when mount mode is RC-targetting, updates the mnt_target object from RC inputs:
     void update_mnt_target_from_rc_target();
-
+    
     //called to remove lean angle in roll/pitch mount angle to convert to bodyframe
     void adjust_mnt_target_if_RP_locked();
-
+    
     // if this function returns true, then when roll and pitch have
     // been locked to body frame (e.g. the user is using a switch or mount option to
     // lock them to body frame) we add in the vehicle's roll and
@@ -349,12 +349,6 @@ protected:
     // returns true if user has configured a valid pitch angle range
     // allows user to disable pitch even on 3-axis gimbal
     bool pitch_range_valid() const { return (_params.pitch_angle_min < _params.pitch_angle_max); }
-
-    // options parameter bitmask handling
-    enum class Options : uint8_t {
-        RCTARGETING_LOCK_FROM_PREVMODE = (1U << 0), // RC_TARGETING mode's lock/follow state maintained from previous mode
-    };
-    bool option_set(Options opt) const { return (_params.options.get() & (uint8_t)opt) != 0; }
 
     // returns true if user has configured a valid yaw angle range
     // allows user to disable yaw even on 3-axis gimbal
@@ -405,7 +399,7 @@ protected:
         uint32_t poi_start_ms;  // time we started trying to find the gimbal POI for an AuxFunc::MOUNT_POI_LOCK
         bool pointing_at_poi_at_home_alt;
     } mnt_target;
-
+    
     // RP earth frame locks accessible by backend
     bool _pitch_lock = true;              // pitch_lock used in RC_TARGETING mode. True if the gimbal's tilt target is maintained in earth-frame, if false (aka "follow") it is maintained in body-frame
     bool _roll_lock = true;               // roll_lock used in RC_TARGETING mode. True if the gimbal's roll target is maintained in earth-frame, if false (aka "follow") it is maintained in body-frame
@@ -451,7 +445,7 @@ private:
 #if AP_MOUNT_POI_LOCK_ENABLED
     void update_poi_lock_target();
 
-    // mount mode saved here entering poi lock for
+    // mount mode saved here entering poi lock for 
     // switching poi lock back to previous mode with aux function middle position
     MAV_MOUNT_MODE saved_mount_mode = MAV_MOUNT_MODE_ENUM_END;
 #endif // AP_MOUNT_POI_LOCK_ENABLED

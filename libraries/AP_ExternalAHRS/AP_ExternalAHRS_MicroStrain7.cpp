@@ -288,8 +288,6 @@ bool AP_ExternalAHRS_MicroStrain7::pre_arm_check(char *failure_msg, uint8_t fail
     static_assert(NUM_GNSS_INSTANCES == 2, "This check only works if there are two GPS types.");
     if (gnss_data[0].fix_type < AP_GPS_FixType::FIX_3D && gnss_data[1].fix_type < AP_GPS_FixType::FIX_3D) {
         hal.util->snprintf(failure_msg, failure_msg_len, LOG_FMT, get_name(), "missing 3D GPS fix on either GPS");
-    if (!filter_state_healthy(FilterState(filter_status.state))) {
-        hal.util->snprintf(failure_msg, failure_msg_len, get_name(), "filter not healthy");
         return false;
     }
 

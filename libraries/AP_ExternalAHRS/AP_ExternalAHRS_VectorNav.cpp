@@ -399,20 +399,20 @@ bool AP_ExternalAHRS_VectorNav::decode_latest_term()
     switch (nmea.term_number) {
         case 0:
             if (strncmp(nmea.term, "VNERR", nmea.term_offset) == 0) {
-                nmea.error_response = true;  // Message will be printed on next term
+                nmea.error_response = true;  // Message will be printed on next term 
             } else if (strncmp(nmea.term, message_to_send, nmea.term_offset) != 0) {
                 return false;
             }
             return true;
-        case 1:
+        case 1: 
             if (nmea.error_response) {
                 GCS_SEND_TEXT(MAV_SEVERITY_CRITICAL, "VectorNav received VNERR code: %s", nmea.term);
-            } else if (strlen(message_to_send) > 6 &&
+            } else if (strlen(message_to_send) > 6 && 
                        strncmp(nmea.term, &message_to_send[6], nmea.term_offset) != 0) {  // Start after "VNXXX,"
                 return false;
             }
             return true;
-        case 2:
+        case 2: 
             if (strncmp(nmea.term, "VN-", 3) == 0) {
                 // This term is the model number
                 strncpy(model_name, nmea.term, sizeof(model_name));
@@ -514,7 +514,7 @@ void AP_ExternalAHRS_VectorNav::write_vnat(const VNAT& data_to_log) const {
                        "Qffffffffff",
                        data_to_log.timeUs,
                        data_to_log.quat[0], data_to_log.quat[1], data_to_log.quat[2], data_to_log.quat[3],
-                       data_to_log.ypr[0], data_to_log.ypr[1], data_to_log.ypr[2],
+                       data_to_log.ypr[0], data_to_log.ypr[1], data_to_log.ypr[2], 
                        data_to_log.yprU[0], data_to_log.yprU[1], data_to_log.yprU[2]);
 #endif
 }
@@ -679,7 +679,7 @@ void AP_ExternalAHRS_VectorNav::process_ins_gnss_packet(const uint8_t *b) {
 
     last_pkt3_ms          = AP_HAL::millis();
     *latest_ins_gnss_packet = pkt;
-
+    
     // get ToW in milliseconds
     gps.gps_week           = pkt.timeGps / (AP_MSEC_PER_WEEK * 1000000ULL);
     gps.ms_tow             = (pkt.timeGps / 1000000ULL) % (60 * 60 * 24 * 7 * 1000ULL);

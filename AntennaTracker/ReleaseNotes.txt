@@ -1020,7 +1020,7 @@ Changes from 4.6.1
 - BLHeli passthrough fixes
 - CAN race condition fixed on Linux and SITL
 - ChibiOS serial driver initialisation respects options to disable TX/RX DMA
-- CRSF bootstrap completes when not using passthrough
+- CRSF bootstrap completes when not using passthrough 
 - CRSF ground speed fixed (was about 20% off)
 - DroneCAN GPS ellipsoid alt only trusted if different from AMSL (avoids false impression of zero undulation)
 - DroneCAN Servos/ESCs fix when commanding output PWM of zero (previously could go to min or full reverse for bidir ESCs)
@@ -1803,7 +1803,7 @@ Changes from 4.5.4
 - use the ESC with the highest RPM in the OSD when only one can be displayed
 - support all Tramp power levels on high power VTXs
 - emit jump count in missions even if no limit
-- improve the bitmask indicating persistent parameters on bootloader flash
+- improve the bitmask indicating persistent parameters on bootloader flash	
 - fix duplicate error condition in the MicroStrain7
 
 5) Other minor enhancements and bug fixes

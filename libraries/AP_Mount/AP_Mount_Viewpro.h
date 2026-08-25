@@ -179,15 +179,6 @@ private:
         STOP_RANGING = 0x05
     };
 
-    // C1 rangefinder commands
-    enum class LRFCommand : uint8_t {
-        NO_ACTION = 0x00,
-        SINGLE_RANGING = 0x01,
-        CONTINUOUS_RANGING_START = 0x02,
-        LPCL_CONTINUOUS_RANGING_START = 0x03,
-        STOP_RANGING = 0x05
-    };
-
     // C2 camera commands
     enum class CameraCommand2 : uint8_t {
         SET_EO_ZOOM = 0x53

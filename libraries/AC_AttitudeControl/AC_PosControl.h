@@ -68,8 +68,8 @@ public:
 
     // Sets a new NED position target in meters and computes a jerk-limited trajectory.
     // Updates internal acceleration commands using a smooth kinematic path constrained
-    // by configured acceleration and jerk limits.
-    // The path can be offset vertically to follow the terrain by providing the current
+    // by configured acceleration and jerk limits. 
+    // The path can be offset vertically to follow the terrain by providing the current 
     // terrain level in the NED frame and the terrain margin. Terrain margin is used to
     // constrain horizontal velocity to avoid vertical buffer violation.
     void input_pos_NED_m(const Vector3p& pos_ned_m, float pos_terrain_target_d_m, float terrain_margin_m);
@@ -791,8 +791,8 @@ private:
     // Internal log writer for PSCx (North, East, Down tracking).
     // Reduces duplication between Write_PSCN, PSCE, and PSCD.
     // Used for logging desired/target/actual position, velocity, and acceleration per axis.
-    static void Write_PSCx(LogMessages ID, float pos_desired_m, float pos_target_m, float pos_m,
-                            float vel_desired_ms, float vel_target_ms, float vel_ms,
+    static void Write_PSCx(LogMessages ID, float pos_desired_m, float pos_target_m, float pos_m, 
+                            float vel_desired_ms, float vel_target_ms, float vel_ms, 
                             float accel_desired_mss, float accel_target_mss, float accel_mss);
 
     // Internal log writer for PSOx (North, East, Down tracking).

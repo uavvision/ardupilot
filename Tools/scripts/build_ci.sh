@@ -412,7 +412,7 @@ for t in $CI_BUILD_TARGET; do
         $waf AP_Periph
         continue
     fi
-
+    
     if [ "$t" == "dds-stm32h7" ]; then
         echo "Building with DDS support on a STM32H7"
         $waf configure --board Durandal --enable-DDS

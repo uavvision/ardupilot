@@ -1,5 +1,5 @@
-# hw definition file for processing by chibios_hwdef.py
 
+# hw definition file for processing by chibios_hwdef.py
 # for Orqa F405 PRO hardware.
 # thanks to betaflight for pin information
 

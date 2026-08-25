@@ -461,10 +461,6 @@ bool RC_Channel_Plane::do_aux_function(const AuxFuncTrigger &trigger)
         // handled by lua scripting, just ignore here
         break;
 
-    case AUX_FUNC::PRECISION_LOITER:
-        // handled by lua scripting, just ignore here
-        break;
-
 #if QAUTOTUNE_ENABLED
     case AUX_FUNC::AUTOTUNE_TEST_GAINS:
         plane.quadplane.qautotune.do_aux_function(ch_flag);

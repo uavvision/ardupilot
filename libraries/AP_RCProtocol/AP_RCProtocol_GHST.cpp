@@ -182,7 +182,7 @@ void AP_RCProtocol_GHST::_process_byte(uint32_t timestamp_us, uint8_t byte)
         _frame_ofs = 0;
         return;
     }
-
+    
     // decode whatever we got and expect
     if (_frame_ofs == _frame.length + GHST_HEADER_LEN) {
         log_data(AP_RCProtocol::GHST, timestamp_us, (const uint8_t*)&_frame, _frame_ofs - GHST_HEADER_LEN);

@@ -228,7 +228,6 @@ bool MAVLink_routing::forward(GCS_MAVLINK &in_link,
                                   !match_system))) {
 
             if (&in_link != out_link && !sent_to_chan[routes[i].channel]) {
-
                 if (out_link->check_payload_size(msg.len)) {
 #if ROUTING_DEBUG
                     ::printf("fwd msg %u from chan %u on chan %u sysid=%d compid=%d\n",

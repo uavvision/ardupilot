@@ -135,21 +135,21 @@ const AP_Param::GroupInfo AC_AttitudeControl::var_info[] = {
 
     // @Param: LAND_R_MULT
     // @DisplayName: Landed roll gain multiplier
-    // @Description: Roll gain multiplier active when landed. A factor of 1.0 means no reduction in gain while landed. Reduce this factor to reduce ground oscitation in the roll axis.
+    // @Description: Roll gain multiplier active when landed. A factor of 1.0 means no reduction in gain while landed. Reduce this factor to reduce ground oscitation in the roll axis. 
     // @Range: 0.25 1.0
     // @User: Advanced
     AP_GROUPINFO("LAND_R_MULT", 21, AC_AttitudeControl, _land_roll_mult, 1.0),
 
     // @Param: LAND_P_MULT
     // @DisplayName: Landed pitch gain multiplier
-    // @Description: Pitch gain multiplier active when landed. A factor of 1.0 means no reduction in gain while landed. Reduce this factor to reduce ground oscitation in the pitch axis.
+    // @Description: Pitch gain multiplier active when landed. A factor of 1.0 means no reduction in gain while landed. Reduce this factor to reduce ground oscitation in the pitch axis. 
     // @Range: 0.25 1.0
     // @User: Advanced
     AP_GROUPINFO("LAND_P_MULT", 22, AC_AttitudeControl, _land_pitch_mult, 1.0),
 
     // @Param: LAND_Y_MULT
     // @DisplayName: Landed yaw gain multiplier
-    // @Description: Yaw gain multiplier active when landed. A factor of 1.0 means no reduction in gain while landed. Reduce this factor to reduce ground oscitation in the yaw axis.
+    // @Description: Yaw gain multiplier active when landed. A factor of 1.0 means no reduction in gain while landed. Reduce this factor to reduce ground oscitation in the yaw axis. 
     // @Range: 0.25 1.0
     // @User: Advanced
     AP_GROUPINFO("LAND_Y_MULT", 23, AC_AttitudeControl, _land_yaw_mult, 1.0),
@@ -483,7 +483,7 @@ void AC_AttitudeControl::input_euler_angle_roll_pitch_yaw_rad(float euler_roll_a
 
     // Add roll trim to compensate tail rotor thrust in heli (will return zero on multirotors)
     euler_roll_angle_rad += get_roll_trim_rad();
-
+    
     float yaw_rate_max_rads = radians(_ang_vel_yaw_max_degs);
     if (slew_yaw) {
         // Replace global yaw rate limit with the slew rate limit (0 disables limiting).
@@ -1110,7 +1110,7 @@ void AC_AttitudeControl::attitude_command_model(float error_angle, float desired
     if (!is_positive(dt)) {
         return;
     }
-
+    
     // protect against divide by zero
     if (!is_positive(accel_max)) {
         // no acceleration set so default to 1800 degrees/s²

@@ -372,7 +372,7 @@ const AP_Param::GroupInfo SIM::var_info2[] = {
     // @Description: Force to the vehicle over a period of time
     // @Units: ms
     AP_GROUPINFO("SHOVE_TIME",  33, SIM,  shove.t, 0),
-
+    
     // @Param: FLOW_RND
     // @DisplayName: Opflow noise
     // @Description: Optical Flow sensor measurement noise
@@ -410,7 +410,7 @@ const AP_Param::GroupInfo SIM::var_info2[] = {
     // @DisplayName: IMU orientation
     // @Description: Simulated orientation of the IMUs
     AP_GROUPINFO("IMU_ORIENT",   42, SIM,  imu_orientation, 0),
-
+    
     // sailboat wave and tide simulation parameters
 
     // @Param: WAVE_ENABLE
@@ -1352,7 +1352,7 @@ const AP_Param::GroupInfo SIM::var_ins[] = {
     // @User: Advanced
 
     // @Param: IMUT1_TMIN
-    // @DisplayName: Simulated temperature calibration min
+    // @DisplayName: Simulated temperature calibration min  
     // @Description: The minimum simulated temperature that the calibration is valid for
     // @Units: degC
     // @Range: -70 80
@@ -1472,7 +1472,7 @@ const AP_Param::GroupInfo SIM::var_ins[] = {
 
     // @Param: IMUT4_TMIN
     // @CopyFieldsFrom: SIM_IMUT1_TMIN
-    // @DisplayName: Simulated temperature calibration min
+    // @DisplayName: Simulated temperature calibration min 
     AP_SUBGROUPINFO(imu_tcal[3], "IMUT4_", 60, SIM, AP_InertialSensor_TCal),
 #endif
 #if INS_MAX_INSTANCES > 4
@@ -1511,7 +1511,7 @@ const AP_Param::GroupInfo SIM::var_ins[] = {
 
     // @Param: IMUT5_TMIN
     // @CopyFieldsFrom: SIM_IMUT1_TMIN
-    // @DisplayName: Simulated temperature calibration min
+    // @DisplayName: Simulated temperature calibration min 
     AP_SUBGROUPINFO(imu_tcal[4], "IMUT5_", 59, SIM, AP_InertialSensor_TCal),
 #endif
 #endif  // HAL_INS_TEMPERATURE_CAL_ENABLE

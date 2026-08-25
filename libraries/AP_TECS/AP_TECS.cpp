@@ -1203,7 +1203,7 @@ void AP_TECS::_initialise_states(float hgt_afe)
         _pitch_measured_lpf.reset(_ahrs.get_pitch_rad());
 
     } else if (_flight_stage == AP_FixedWing::FlightStage::TAKEOFF || _flight_stage == AP_FixedWing::FlightStage::ABORT_LANDING) {
-
+        
         if (!_flag_throttle_forced) {
             // Calculate the takeoff target height offset before _hgt_dem_in_raw gets reset below.
             // Prevent the offset from becoming negative.
@@ -1227,7 +1227,7 @@ void AP_TECS::_initialise_states(float hgt_afe)
         _max_sink_scaler = 1.0f;
         _pitch_demand_lpf.reset(_ahrs.get_pitch_rad());
         _pitch_measured_lpf.reset(_ahrs.get_pitch_rad());
-
+        
 
         if (!_flag_have_reset_after_takeoff) {
             _flags.reset          = true;
@@ -1442,7 +1442,7 @@ void AP_TECS::_update_throttle_limits() {
     } else {
         _flag_throttle_forced = false;
     }
-
+    
     // Reset the external throttle limits.
     // Caller will have to reset them in the next iteration.
     if (_thr_min_pct_ext_rate_lim > 0) {
@@ -1542,7 +1542,7 @@ void AP_TECS::_update_pitch_limits(const int32_t ptchMinCO_cd) {
     // Apply external limits.
     _PITCHmaxf = MIN(_PITCHmaxf, _PITCHmaxf_ext);
     _PITCHminf = MAX(_PITCHminf, _PITCHminf_ext);
-
+    
     // Reset the external pitch limits.
     _PITCHminf_ext = -90.0f;
     _PITCHmaxf_ext = 90.0f;

@@ -340,7 +340,7 @@ private:
         MANUALLY_ENABLED,
         MANUALLY_DISABLED
     } _min_alt_state;
-
+    
 
     AC_PolyFence_loader _poly_loader{_total, _options}; // polygon fence
 };

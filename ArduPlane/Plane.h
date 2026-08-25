@@ -339,7 +339,7 @@ private:
 #if AP_QUICKTUNE_ENABLED
     AP_Quicktune quicktune;
 #endif
-
+    
     // This is the state of the flight control system
     // There are multiple states defined such as MANUAL, FBW-A, AUTO
     Mode *control_mode = &mode_initializing;
@@ -542,7 +542,7 @@ private:
         // are we in idle mode? used for balloon launch to stop servo
         // movement until altitude is reached
         bool idle_mode;
-
+        
         // are we in VTOL mode in AUTO?
         bool vtol_mode;
 
@@ -1333,7 +1333,7 @@ public:
     bool tkoff_option_is_set(AP_FixedWing::TakeoffOption option) const {
         return (aparm.takeoff_options & int32_t(option)) != 0;
     }
-
+   
 
 };
 

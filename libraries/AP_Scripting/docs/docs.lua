@@ -2620,7 +2620,7 @@ serialLED = {}
 
 -- Send the configured RGB values to the LED string
 ---@param chan integer -- output number to which the leds are attached 1-16
----@return boolean -- true if successful
+---@return boolean -- true if successful 
 function serialLED:send(chan) end
 
 --  Set the data for LED_number on the string attached channel output
@@ -3694,7 +3694,7 @@ function arming:pre_arm_checks() end
 function arming:disarm() end
 
 
--- The ahrs library represents the Attitude Heading Reference System computed by the autopilot.
+-- The ahrs library represents the Attitude Heading Reference System computed by the autopilot. 
 -- It provides estimates for the vehicles attitude, and position.
 ahrs = {}
 
@@ -3943,30 +3943,6 @@ function precland:target_acquired() end
 ---@return boolean
 function precland:healthy() end
 
--- precision landing access
----@class precland
-precland = {}
-
--- get Location of target or nil if target not acquired
----@return Location_ud|nil
-function precland:get_target_location() end
-
--- get NE velocity of target or nil if not available
----@return Vector2f_ud|nil
-function precland:get_target_velocity() end
-
--- get the time of the last valid target
----@return uint32_t_ud
-function precland:get_last_valid_target_ms() end
-
--- return true if target is acquired
----@return boolean
-function precland:target_acquired() end
-
--- return true if precland system is healthy
----@return boolean
-function precland:healthy() end
-
 -- desc
 follow = {}
 
@@ -4127,7 +4103,7 @@ function fence:get_breach_direction_NED(fence_type) end
 
 -- Rally library
 rally = {}
--- Returns a specfic rally by index as a Location
+-- Returns a specfic rally by index as a Location 
 ---@param index integer -- 0 indexed
 ---@return Location_ud|nil
 function rally:get_rally_location(index) end

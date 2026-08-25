@@ -1008,8 +1008,7 @@ bool AP_AHRS::_should_use_airspeed_sensor(uint8_t airspeed_index) const
     // TODO: in v4.6 use `DontDisableAirspeedUsingEKF`
     // https://ardupilot.org/plane/docs/parameters.html#ahrs-options-optional-ahrs-behaviour
     // nav_filter_status filter_status;
-    // if (!option_set(Options::DISABLE_AIRSPEED_EKF_CHECK) &&
-        fly_forward &&
+    // if (fly_forward &&
     //     hal.util->get_soft_armed() &&
     //     get_filter_status(filter_status) &&
     //     (filter_status.flags.rejecting_airspeed && !filter_status.flags.dead_reckoning)) {

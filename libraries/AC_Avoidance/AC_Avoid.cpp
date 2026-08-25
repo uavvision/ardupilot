@@ -123,14 +123,6 @@ const AP_Param::GroupInfo AC_Avoid::var_info[] = {
     AP_GROUPINFO_FRAME("ANG_MAX", 11,  AC_Avoid, _angle_max_deg, 10.0, AP_PARAM_FRAME_COPTER | AP_PARAM_FRAME_HELI | AP_PARAM_FRAME_TRICOPTER),
 #endif
 
-    // @Param: BACKZ_SPD
-    // @DisplayName: Avoidance maximum vertical backup speed
-    // @Description: Maximum speed that will be used to back away from obstacles vertically in height control modes (m/s). Set zero to disable vertical backup.
-    // @Units: m/s
-    // @Range: 0 2
-    // @User: Standard
-    AP_GROUPINFO("BACKZ_SPD", 10, AC_Avoid, _backup_speed_z_max, 0.75),
-
     AP_GROUPEND
 };
 
@@ -643,7 +635,7 @@ void AC_Avoid::limit_velocity_NEU(float kP, float accel, Vector3f &desired_vel_n
     const float speed_u = fabsf(desired_vel_neu.z);
 
     // obstacle_vector_neu.z and margin_vector_neu.z should be in same direction as checked above
-    const float dist_u = MAX(fabsf(obstacle_vector_neu.z) - fabsf(margin_vector_neu.z), 0.0f);
+    const float dist_u = MAX(fabsf(obstacle_vector_neu.z) - fabsf(margin_vector_neu.z), 0.0f); 
     if (is_zero(dist_u)) {
         // eliminate any vertical velocity 
         desired_vel_neu.z = 0.0f;
@@ -690,7 +682,7 @@ void AC_Avoid::calc_backup_velocity_2D(float kP, float accel_cmss, Vector2f &qua
 * max_z_vel is >= 0, and stores the greatest velocity in the upwards direction
 * eventually max_z_vel + min_z_vel will give the final desired Z backaway velocity
 */
-void AC_Avoid::calc_backup_velocity_3D(float kP, float accel_cmss, Vector2f &quad1_back_vel_cms, Vector2f &quad2_back_vel_cms, Vector2f &quad3_back_vel_cms, Vector2f &quad4_back_vel_cms,
+void AC_Avoid::calc_backup_velocity_3D(float kP, float accel_cmss, Vector2f &quad1_back_vel_cms, Vector2f &quad2_back_vel_cms, Vector2f &quad3_back_vel_cms, Vector2f &quad4_back_vel_cms, 
                                         float back_distance_cms, Vector3f limit_direction_neu, float kp_z, float accel_z_cmss, float back_distance_u_cm, float& min_vel_u_cms, float& max_vel_u_cms, float dt) const
 {   
     // backup horizontally 
@@ -709,7 +701,7 @@ void AC_Avoid::calc_backup_velocity_3D(float kP, float accel_cmss, Vector2f &qua
 
         // store the z backup speed into min or max z if possible
         if (back_speed_z_cms < min_vel_u_cms) {
-            min_vel_u_cms = back_speed_z_cms;
+            min_vel_u_cms = back_speed_z_cms;  
         }
         if (back_speed_z_cms > max_vel_u_cms) {
             max_vel_u_cms = back_speed_z_cms;
@@ -839,7 +831,7 @@ void AC_Avoid::adjust_velocity_circle_fence(float kP, float accel_cmss, Vector2f
     Vector2f quad_1_back_vel_ne_cms, quad_2_back_vel_ne_cms, quad_3_back_vel_ne_cms, quad_4_back_vel_ne_cms;
     
     // back away if vehicle has breached margin
-    if (is_negative(distance_to_boundary_cm - margin_cm)) {
+    if (is_negative(distance_to_boundary_cm - margin_cm)) {     
         calc_backup_velocity_2D(kP, accel_cmss, quad_1_back_vel_ne_cms, quad_2_back_vel_ne_cms, quad_3_back_vel_ne_cms, quad_4_back_vel_ne_cms, margin_cm - distance_to_boundary_cm, position_ne_cm, dt);
     }
     // desired backup velocity is sum of maximum velocity component in each quadrant 
@@ -1260,7 +1252,7 @@ void AC_Avoid::adjust_velocity_proximity(float kP, float accel_cmss, Vector3f &d
     // for backing away
     Vector2f quad_1_back_vel_ne_cms, quad_2_back_vel_ne_cms, quad_3_back_vel_ne_cms, quad_4_back_vel_ne_cms;
     float max_back_vel_u_cms = 0.0f;
-    float min_back_vel_u_cms = 0.0f;
+    float min_back_vel_u_cms = 0.0f; 
 
     // rotate velocity vector from earth frame to body-frame since obstacles are in body-frame
     const Vector2f desired_vel_body_ne_cms = _ahrs.earth_to_body2D(Vector2f{desired_vel_neu_cms.x, desired_vel_neu_cms.y});
@@ -1414,7 +1406,7 @@ void AC_Avoid::adjust_velocity_polygon(float kP, float accel_cmss, Vector2f &des
 
     // for stopping
     const float speed = safe_vel_ne_cms.length();
-    Vector2f stopping_point_plus_margin_ne_cm;
+    Vector2f stopping_point_plus_margin_ne_cm; 
     if (!desired_vel_cms.is_zero()) {
         stopping_point_plus_margin_ne_cm = position_ne_cm + safe_vel_ne_cms*((2.0f + margin_cm + get_stopping_distance(kP, accel_cmss, speed))/speed);
     }

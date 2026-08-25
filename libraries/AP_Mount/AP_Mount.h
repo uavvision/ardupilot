@@ -177,7 +177,7 @@ public:
     // If false (aka "follow") the gimbal's yaw is maintained in body-frame meaning it will rotate with the vehicle
     void set_yaw_lock(bool yaw_lock) { set_yaw_lock(_primary, yaw_lock); }
     void set_yaw_lock(uint8_t instance, bool yaw_lock);
-
+    
 #if AP_MOUNT_POI_LOCK_ENABLED
     // controls POI lock which locks gimbal to GPS point currently in view and switches to GPS Targeting mode, suspends tracking poi or clears it
     void set_poi_lock() { set_poi_lock(_primary); }

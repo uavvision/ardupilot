@@ -49,12 +49,12 @@ extern const AP_HAL::HAL& hal;
  # define POSCONTROL_NE_VEL_FILT_HZ             5.0f    // horizontal velocity controller input filter
  # define POSCONTROL_NE_VEL_FILT_D_HZ           5.0f    // horizontal velocity controller input filter for D
 #else
- // default gains common between TradHeli and Copter
+ // default gains common between TradHeli and Copter 
  # define POSCONTROL_D_POS_P                    1.0f    // vertical position controller P gain default
  # define POSCONTROL_D_VEL_P                    5.0f    // vertical velocity controller P gain default
  # define POSCONTROL_D_VEL_IMAX                 10.0f   // vertical velocity controller IMAX gain default
  # define POSCONTROL_D_VEL_FILT_HZ              5.0f    // vertical velocity controller input filter
- # define POSCONTROL_D_VEL_FILT_D_HZ            5.0f    // vertical velocity controller input filter for D
+ # define POSCONTROL_D_VEL_FILT_D_HZ            5.0f    // vertical velocity controller input filter for D 
  # define POSCONTROL_D_ACC_I                    0.1f    // vertical acceleration controller I gain default
  # define POSCONTROL_D_ACC_D                    0.0f    // vertical acceleration controller D gain default
  # define POSCONTROL_D_ACC_IMAX                 0.8f    // vertical acceleration controller IMAX gain default
@@ -65,7 +65,7 @@ extern const AP_HAL::HAL& hal;
  # define POSCONTROL_NE_VEL_FILT_HZ             5.0f    // horizontal velocity controller input filter
  # define POSCONTROL_NE_VEL_FILT_D_HZ           5.0f    // horizontal velocity controller input filter for D
  #if APM_BUILD_TYPE(APM_BUILD_Heli)
-  // default gains specific to TradHeli
+  // default gains specific to TradHeli 
   # define POSCONTROL_D_ACC_P                    0.028f  // vertical acceleration controller P gain default
   # define POSCONTROL_NE_VEL_P                   1.0f    // horizontal velocity controller P gain default
   # define POSCONTROL_NE_VEL_I                   0.5f    // horizontal velocity controller I gain default
@@ -379,8 +379,8 @@ AC_PosControl::AC_PosControl(AP_AHRS_View& ahrs, const AP_Motors& motors, AC_Att
 
 // Sets a new NED position target in meters and computes a jerk-limited trajectory.
 // Updates internal acceleration commands using a smooth kinematic path constrained
-// by configured acceleration and jerk limits.
-// The path can be offset vertically to follow the terrain by providing the current
+// by configured acceleration and jerk limits. 
+// The path can be offset vertically to follow the terrain by providing the current 
 // terrain level in the NED frame and the terrain margin. Terrain margin is used to
 // constrain horizontal velocity to avoid vertical buffer violation.
 void AC_PosControl::input_pos_NED_m(const Vector3p& pos_ned_m, float pos_terrain_target_d_m, float terrain_margin_m)
@@ -545,7 +545,7 @@ void AC_PosControl::NE_init_controller()
 {
     // initialise offsets to target offsets and ensure offset targets are zero if they have not been updated.
     NE_init_offsets();
-
+    
     // set roll, pitch lean angle targets to current attitude
     const Vector3f &att_target_euler_rad = _attitude_control.get_att_target_euler_rad();
     _roll_target_rad = att_target_euler_rad.x;
@@ -620,10 +620,10 @@ void AC_PosControl::input_vel_accel_NE_m(Vector2f& vel_ne_ms, const Vector2f& ac
 // See input_pos_vel_accel_NE_m() for full details.
 void AC_PosControl::input_pos_vel_accel_NE_cm(Vector2p& pos_ne_cm, Vector2f& vel_ne_cms, const Vector2f& accel_ne_cmss, bool limit_output)
 {
-    Vector2p pos_ne_m = pos_ne_cm * 0.01;
+    Vector2p pos_ne_m = pos_ne_cm * 0.01; 
     Vector2f vel_ne_ms = vel_ne_cms * 0.01;
     input_pos_vel_accel_NE_m(pos_ne_m, vel_ne_ms, accel_ne_cmss * 0.01, limit_output);
-    pos_ne_cm = pos_ne_m * 100.0;
+    pos_ne_cm = pos_ne_m * 100.0; 
     vel_ne_cms = vel_ne_ms * 100.0;
 }
 
@@ -676,7 +676,7 @@ void AC_PosControl::NE_stop_vel_stabilisation()
 {
     _pos_target_ned_m.xy() =  _pos_estimate_ned_m.xy();
     _pos_desired_ned_m.xy() = _pos_target_ned_m.xy() - _pos_offset_ned_m.xy();
-
+    
     _vel_target_ned_ms.xy() = _vel_estimate_ned_ms.xy();
     _vel_desired_ned_ms.xy() = _vel_target_ned_ms.xy() - _vel_offset_ned_ms.xy();
 
@@ -1562,11 +1562,11 @@ float AC_PosControl::crosstrack_error_m() const
 
 #if APM_BUILD_TYPE(APM_BUILD_ArduPlane)
     // Returns true if the requested forward pitch is limited by the configured tilt constraint.
-bool AC_PosControl::get_fwd_pitch_is_limited() const
+bool AC_PosControl::get_fwd_pitch_is_limited() const 
 {
-    if (_limit_vector_ned.xy().is_zero()) {
-        return false;
-    }
+    if (_limit_vector_ned.xy().is_zero()) {  
+        return false;  
+    }  
     const float angle_max_rad = MIN(_attitude_control.get_althold_lean_angle_max_rad(), get_lean_angle_max_rad());
     const float accel_max_mss = angle_rad_to_accel_mss(angle_max_rad);
     // Check for pitch limiting in the forward direction

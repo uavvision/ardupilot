@@ -550,8 +550,8 @@ AP_AHRS_DCM::drift_correction_yaw(void)
             _gps_last_update = _gps.last_fix_time_ms();
         }
 
-    // NOTE: Only when `use_compass` returns false, but since we disabled 
-    // GPS usage there, we will always use compass
+        // NOTE: Only when `use_compass` returns false, but since we disabled
+        // GPS usage there, we will always use compass
     } else if (AP::ahrs().get_fly_forward() && have_gps()) {
         /*
           we are using GPS for yaw

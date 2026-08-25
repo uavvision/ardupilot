@@ -331,10 +331,9 @@ private:
     } vibration_check;
 
     // EKF variances are unfiltered and are designed to recover very quickly when possible
-    // thus failsafes should be triggered on filtered values in order to avoid transient errors
+    // thus failsafes should be triggered on filtered values in order to avoid transient errors 
     LowPassFilterFloat pos_variance_filt;
     LowPassFilterFloat vel_variance_filt;
-    LowPassFilterFloat hgt_variance_filt;
     bool variances_valid;
     uint32_t last_ekf_check_us;
 

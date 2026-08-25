@@ -338,10 +338,6 @@ void AP_Proximity_RPLidarA2::parse_response_device_info()
         model = Model::A2;
         device_type = "A2";
         break;
-    case 0x41:
-        model=Model::C1;
-        device_type="C1";
-        break;
     case 0x2C:
         model = Model::A2M12;
         device_type = "A2M12";

@@ -28,7 +28,7 @@
 
 #include <AP_HAL/Semaphores.h>
 
-#ifndef AP_PROXIMITY_MAX_INSTANCES
+#ifndef AP_PROXIMITY_MAX_INSTANCES 
   #define AP_PROXIMITY_MAX_INSTANCES             5   // Maximum number of proximity sensor instances available on this platform
 #endif
 #define PROXIMITY_SENSOR_ID_START 10
@@ -121,7 +121,7 @@ public:
     // return sensor health
     Status get_instance_status(uint8_t instance) const;
 
-    // Returns status of first good sensor. If no good sensor found, returns status of last instance sensor
+    // Returns status of first good sensor. If no good sensor found, returns status of last instance sensor 
     Status get_status() const;
 
     // prearm checks

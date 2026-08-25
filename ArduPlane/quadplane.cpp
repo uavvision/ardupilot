@@ -238,7 +238,7 @@ const AP_Param::GroupInfo QuadPlane::var_info[] = {
     // @Bitmask: 1: Disable quadplane spin recovery
     // @User: Standard
     AP_GROUPINFO("ASSIST_OPTIONS", 47, QuadPlane, assist.options, 0),
-
+    
     // 47: TILT_TYPE // was AP_Int8, re-used by AP_Int16 ASSIST_OPTIONS
     // 48: TAILSIT_ANGLE
     // 61: TAILSIT_ANG_VT
@@ -548,7 +548,7 @@ const AP_Param::GroupInfo QuadPlane::var_info2[] = {
     // @Increment: 1
     // @User: Standard
     AP_GROUPINFO("APPROACH_DIST", 39, QuadPlane, approach_distance_m, 0),
-
+    
 #if HAL_WITH_ESC_TELEM
     // @Param: TKOFF_RPM_MIN
     // @DisplayName: Auto Takeoff Check RPM minimum
@@ -1264,7 +1264,7 @@ bool QuadPlane::is_flying_vtol(void) const
 
 /*
   smooth out descent rate for landing to prevent a jerk as we get to
-  land_final_alt_m.
+  land_final_alt_m. 
  */
 float QuadPlane::landing_descent_rate_ms(float height_above_ground_m)
 {
@@ -2646,7 +2646,7 @@ void QuadPlane::vtol_position_controller(void)
                                                   2*position2_dist_threshold_m + stopping_distance_m(rel_groundspeed_sq));
 
                 target_speed_ne_ms = diff_wp_norm * approach_speed_ms;
-
+                
                 // adjust target yaw angle into the apparent wind
                 const Vector2f wind_ms = plane.ahrs.wind_estimate().xy();
                 const Vector2f airspeed_ne_ms = plane.ahrs.groundspeed_vector() - wind_ms;
@@ -3032,37 +3032,6 @@ void QuadPlane::assign_tilt_to_fwd_thr(void)
         // @Field: NPULCD: upper limit for navigation pitch
         // @Field: QBPLCD: upper limit for back transition pitch
         // @Field: NPCD: demanded navigation pitch
-        AP::logger().WriteStreaming("QBRK",
-                                "TimeUS,SpdScaler,NPULCD,QBPLCD,NPCD",  // labels
-                                "Qffii",    // fmt
-                                AP_HAL::micros64(),
-                                (double)speed_scaler,
-                                (double)nav_pitch_upper_limit_cd,
-                                (int32_t)q_bck_pitch_lim_cd,
-                                (int32_t)plane.nav_pitch_cd);
-#endif
-    }
-
-    // Prevent the wing from being overloaded when braking from high speed in a VTOL mode
-    float nav_pitch_upper_limit_cd = 100.0f * q_bck_pitch_lim;
-    float aspeed;
-    if (is_positive(q_bck_pitch_lim) && ahrs.airspeed_estimate(aspeed)) {
-        const float reference_speed = MAX(plane.aparm.airspeed_min, MIN_AIRSPEED_MIN);
-        float speed_scaler = sq(reference_speed / MAX(aspeed, 0.1f));
-        nav_pitch_upper_limit_cd *= speed_scaler;
-        nav_pitch_upper_limit_cd = MIN(nav_pitch_upper_limit_cd, (float)aparm.angle_max);
-
-        const float tconst = 0.5f;
-        const float dt = AP_HAL::millis() - q_pitch_limit_update_ms;
-        q_pitch_limit_update_ms = AP_HAL::millis();
-        if (is_positive(dt)) {
-            const float coef = dt / (dt + tconst);
-            q_bck_pitch_lim_cd = (1.0f - coef) * q_bck_pitch_lim_cd + coef * nav_pitch_upper_limit_cd;
-        }
-
-        plane.nav_pitch_cd = MIN(plane.nav_pitch_cd, (int32_t)q_bck_pitch_lim_cd);
-
-#if HAL_LOGGING_ENABLED
         AP::logger().WriteStreaming("QBRK",
                                 "TimeUS,SpdScaler,NPULCD,QBPLCD,NPCD",  // labels
                                 "Qffii",    // fmt
@@ -4540,7 +4509,7 @@ bool SLT_Transition::active_frwd() const
     if (quadplane.in_vtol_airbrake()) {
         return false;
     }
-
+    
     return true;
 }
 

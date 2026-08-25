@@ -193,9 +193,9 @@ void AP_RCProtocol_CRSF::_process_byte(uint8_t byte)
     if (_frame_ofs == 0) {
         _start_frame_time_us = now;
     }
-
+    
     _frame_bytes[_frame_ofs++] = byte;
-
+    
     if (!check_frame(now)) {
         skip_to_next_frame(now);
     }

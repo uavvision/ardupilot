@@ -124,7 +124,7 @@ const AP_Param::GroupInfo SIM_Precland::var_info[] = {
     // @User: Advanced
     AP_GROUPINFO("SHIP",  11, SIM_Precland, _ship, 0),
 #endif
-
+    
     AP_GROUPEND
 };
 

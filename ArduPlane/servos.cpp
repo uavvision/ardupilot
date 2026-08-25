@@ -104,8 +104,7 @@ bool Plane::suppress_throttle(void)
         return false;
     }
 
-//    bool gps_movement = (gps.status() >= AP_GPS::GPS_OK_FIX_2D && gps.ground_speed() >= 5);
-    bool gps_movement = true;
+    bool gps_movement = (gps.status() >= AP_GPS::GPS_OK_FIX_2D && gps.ground_speed() >= 5);
     
     if ((control_mode == &mode_auto &&
          auto_state.takeoff_complete == false) ||
@@ -373,24 +372,24 @@ void ModeAuto::wiggle_servos()
     if (wiggle.stage == 0) {
         servo_valueElevator = 0;
         servo_valueAileronRudder = 0;
-    } else if (wiggle.stage < 25) {
-        servo_valueElevator = wiggle.stage * (4500 / 25);
+    } else if (wiggle.stage < 25) { 
+        servo_valueElevator = wiggle.stage * (4500 / 25);      
         servo_valueAileronRudder = 0;
     } else if (wiggle.stage < 75) {
-        servo_valueElevator = (50 - wiggle.stage) * (4500 / 25);
+        servo_valueElevator = (50 - wiggle.stage) * (4500 / 25);        
         servo_valueAileronRudder = 0;
     } else if (wiggle.stage < 100) {
-        servo_valueElevator = (wiggle.stage - 100) * (4500 / 25);
+        servo_valueElevator = (wiggle.stage - 100) * (4500 / 25);        
         servo_valueAileronRudder = 0;
     } else if (wiggle.stage < 125) {
         servo_valueElevator = 0;
         servo_valueAileronRudder = (wiggle.stage - 100) * (4500 / 25);
     } else if (wiggle.stage < 175) {
         servo_valueElevator = 0;
-        servo_valueAileronRudder = (150 - wiggle.stage) * (4500 / 25);
+        servo_valueAileronRudder = (150 - wiggle.stage) * (4500 / 25);  
     } else if (wiggle.stage < 200) {
         servo_valueElevator = 0;
-        servo_valueAileronRudder = (wiggle.stage - 200) * (4500 / 25);
+        servo_valueAileronRudder = (wiggle.stage - 200) * (4500 / 25); 
     } else {
         wiggle.stage = 0;
         servo_valueElevator = 0;
@@ -612,42 +611,6 @@ float Plane::apply_throttle_limits(float throttle_in)
  */
 void Plane::set_throttle(void)
 {
-
-    if (!arming.is_armed_and_safety_off()) {
-        // Always set 0 scaled even if overriding to zero pwm.
-        // This ensures slew limits and other functions using the scaled value pick up in the correct place
-        SRV_Channels::set_output_scaled(SRV_Channel::k_throttle, 0.0);
-        SRV_Channels::set_output_scaled(SRV_Channel::k_throttleLeft, 0.0);
-        SRV_Channels::set_output_scaled(SRV_Channel::k_throttleRight, 0.0);
-
-        if (arming.arming_required() == AP_Arming::Required::YES_ZERO_PWM) {
-            SRV_Channels::set_output_limit(SRV_Channel::k_throttle, SRV_Channel::Limit::ZERO_PWM);
-            SRV_Channels::set_output_limit(SRV_Channel::k_throttleLeft, SRV_Channel::Limit::ZERO_PWM);
-            SRV_Channels::set_output_limit(SRV_Channel::k_throttleRight, SRV_Channel::Limit::ZERO_PWM);
-        }
-        return;
-    }
-
-    if (suppress_throttle()) {
-        if (g.throttle_suppress_manual) {
-            // manual pass through of throttle while throttle is suppressed
-            SRV_Channels::set_output_scaled(SRV_Channel::k_throttle, get_throttle_input(true));
-
-        } else if (landing.is_flaring() && landing.use_thr_min_during_flare() ) {
-            // throttle is suppressed (above) to zero in final flare in auto mode, but we allow instead thr_min if user prefers, eg turbines:
-            SRV_Channels::set_output_scaled(SRV_Channel::k_throttle, aparm.throttle_min.get());
-        } else if ((flight_stage == AP_FixedWing::FlightStage::TAKEOFF)
-                    && (aparm.takeoff_throttle_idle.get() > 0)
-                  ) {
-            // we want to spin at idle throttle before the takeoff conditions are met
-            SRV_Channels::set_output_scaled(SRV_Channel::k_throttle, aparm.takeoff_throttle_idle.get());
-        } else {
-            // default
-            SRV_Channels::set_output_scaled(SRV_Channel::k_throttle, 0.0);
-
-        }
-        return;
-    }
 
     // Update voltage scaling
     g2.fwd_batt_cmp.update();

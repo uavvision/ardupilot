@@ -151,11 +151,11 @@ const AP_Param::Info Plane::var_info[] = {
 
     // @Param: TKOFF_OPTIONS
     // @DisplayName: Takeoff options
-    // @Description: This selects the mode of the takeoff in AUTO and TAKEOFF flight modes.
+    // @Description: This selects the mode of the takeoff in AUTO and TAKEOFF flight modes. 
     // @Bitmask: 0: When unset the maximum allowed throttle is always used (THR_MAX or TKOFF_THR_MAX) during takeoff. When set TECS is allowed to operate between a minimum (THR_MIN or TKOFF_THR_MIN) and a maximum (THR_MAX or TKOFF_THR_MAX) limit. Applicable only when using an airspeed sensor.
     // @User: Advanced
     ASCALAR(takeoff_options,               "TKOFF_OPTIONS",       0),
-
+    
     // @Param: TKOFF_TDRAG_ELEV
     // @DisplayName: Takeoff tail dragger elevator
     // @Description: This parameter sets the amount of elevator to apply during the initial stage of a takeoff. It is used to hold the tail wheel of a taildragger on the ground during the initial takeoff stage to give maximum steering. This option should be combined with the TKOFF_TDRAG_SPD1 option and the GROUND_STEER_ALT option along with tuning of the ground steering controller. A value of zero means to bypass the initial "tail hold" stage of takeoff. Set to zero for hand and catapult launch. For tail-draggers you should normally set this to 100, meaning full up elevator during the initial stage of takeoff. For most tricycle undercarriage aircraft a value of zero will work well, but for some tricycle aircraft a small negative value (say around -20 to -30) will apply down elevator which will hold the nose wheel firmly on the ground during initial acceleration. Only use a negative value if you find that the nosewheel doesn't grip well during takeoff. Too much down elevator on a tricycle undercarriage may cause instability in steering as the plane pivots around the nosewheel. Add down elevator 10 percent at a time.
@@ -209,15 +209,6 @@ const AP_Param::Info Plane::var_info[] = {
     // @Increment: 1
     // @User: Advanced
     GSCALAR(takeoff_flap_percent,     "TKOFF_FLAP_PCNT", 0),
-
-    // @Param: TKOFF_THR_IDLE
-    // @DisplayName: Takeoff idle throttle
-    // @Description: The idle throttle to hold after arming and before a takeoff. Applicable in TAKEOFF and AUTO modes.
-    // @Units: %
-    // @Range: 0 100
-    // @Increment: 1
-    // @User: Standard
-    ASCALAR(takeoff_throttle_idle,       "TKOFF_THR_IDLE",    0),
 
     // @Param: LEVEL_ROLL_LIMIT
     // @DisplayName: Level flight roll limit
@@ -979,7 +970,7 @@ const AP_Param::Info Plane::var_info[] = {
     // @Path: pullup.cpp
     GOBJECTN(mode_auto.pullup, pullup, "PUP_", GliderPullup),
 #endif
-
+    
     // @Group:
     // @Path: ../libraries/AP_Vehicle/AP_Vehicle.cpp
     PARAM_VEHICLE_INFO,
@@ -1269,7 +1260,7 @@ const AP_Param::GroupInfo ParametersG2::var_info[] = {
     // @Path: systemid.cpp
     AP_SUBGROUPINFO(systemid, "SID", 38, ParametersG2, AP_SystemID),
 #endif
-
+    
     // @Param: CLIMB_SLOPE_HGT
     // @DisplayName: Climb slope minimum height
     // @Description: Sets the minimum height above home at which the aircraft will apply a climb slope between waypoints. Below it, the aircraft will ascend immediately, and will only resume the requested trajectory upon reaching this height. This prevents unsafe behavior such as attempting to slowly gain altitude near obstacles. The default value ensures safe operations in most environments, but it can be adjusted based on specific terrain or operational needs.

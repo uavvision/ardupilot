@@ -188,7 +188,7 @@ const AP_Param::GroupInfo AC_PrecLand::var_info[] = {
     // @Values: 0:Forward, 4:Back, 25:Down
     // @User: Advanced
     // @RebootRequired: True
-    AP_GROUPINFO_FRAME("ORIENT", 18, AC_PrecLand, _orient, AC_PRECLAND_ORIENT_DEFAULT, AP_PARAM_FRAME_ROVER),
+    AP_GROUPINFO_FRAME("ORIENT", 18, AC_PrecLand, _orient, AC_PRECLAND_ORIENT_DEFAULT, AP_PARAM_FRAME_ROVER), 
 
     AP_GROUPEND
 };
@@ -752,9 +752,6 @@ void AC_PrecLand::run_output_prediction()
     Vector3f vel_ned_rel_imu = Tbn * (_ahrs.get_gyro() % (-accel_body_offset));
     _target_vel_rel_out_ne_ms.x -= vel_ned_rel_imu.x;
     _target_vel_rel_out_ne_ms.y -= vel_ned_rel_imu.y;
-
-    // remember vehicle velocity
-    UNUSED_RESULT(_ahrs.get_velocity_NED(_last_veh_velocity_NED_ms));
 
     // remember vehicle velocity
     UNUSED_RESULT(_ahrs.get_velocity_NED(_last_veh_velocity_NED_ms));
