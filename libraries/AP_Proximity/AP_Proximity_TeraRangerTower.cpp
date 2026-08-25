@@ -45,11 +45,11 @@ void AP_Proximity_TeraRangerTower::update(void)
 }
 
 // get maximum and minimum distances (in meters) of primary sensor
-float AP_Proximity_TeraRangerTower::distance_max() const
+float AP_Proximity_TeraRangerTower::distance_max_m() const
 {
     return 4.5f;
 }
-float AP_Proximity_TeraRangerTower::distance_min() const
+float AP_Proximity_TeraRangerTower::distance_min_m() const
 {
     return 0.20f;
 }
@@ -65,8 +65,8 @@ bool AP_Proximity_TeraRangerTower::read_sensor_data()
     int16_t nbytes = _uart->available();
 
     while (nbytes-- > 0) {
-        int16_t c = _uart->read();
-        if (c==-1) {
+        uint8_t c;
+        if (!_uart->read(c)) {
             return false;
         }
         if (char(c) == 'T' ) {

@@ -31,7 +31,11 @@ QuadPlane::QuadPlane(const char *frame_str) :
 
     ground_behavior = GROUND_BEHAVIOR_NO_MOVEMENT;
 
-    if (strstr(frame_str, "-octa-quad")) {
+    if (strstr(frame_str, "-octa-quad-cor")) {
+        frame_type = "octa-quad-cor";
+    } else if (strstr(frame_str, "-octa-quad-cw-cor")) {
+        frame_type = "octa-quad-cw-cor";
+    } else if (strstr(frame_str, "-octa-quad")) {
         frame_type = "octa-quad";
     } else if (strstr(frame_str, "-octaquad")) {
         frame_type = "octa-quad";
@@ -65,6 +69,10 @@ QuadPlane::QuadPlane(const char *frame_str) :
         thrust_scale = 0;
         // vtol motors start at 2
         motor_offset = 2;
+    } else if (strstr(frame_str, "-tilt")) {
+        frame_type = "tilt";
+        // fwd motor gives zero thrust
+        thrust_scale = 0;
     } else if (strstr(frame_str, "cl84")) {
         frame_type = "tilttri";
         // fwd motor gives zero thrust
@@ -75,9 +83,9 @@ QuadPlane::QuadPlane(const char *frame_str) :
         ground_behavior = GROUND_BEHAVIOR_TAILSITTER;
         thrust_scale *= 1.5;
     }
-    frame = Frame::find_frame(frame_type);
+    frame = Frame::create_frame(frame_type);
     if (frame == nullptr) {
-        printf("Failed to find frame '%s'\n", frame_type);
+        printf("Failed to find frame '%s' or insufficient memory\n", frame_type);
         exit(1);
     }
 

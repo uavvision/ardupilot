@@ -14,8 +14,13 @@
  */
 #pragma once
 
-#include <AP_Common/AP_Common.h>
+#include "AP_BattMonitor_config.h"
+
+#if AP_BATTERY_ENABLED
+
 #include "AP_BattMonitor.h"
+
+#include <AP_Common/AP_Common.h>
 
 class AP_BattMonitor_Backend
 {
@@ -84,8 +89,8 @@ public:
     void Log_Write_BAT(const uint8_t instance, const uint64_t time_us) const;
     void Log_Write_BCL(const uint8_t instance, const uint64_t time_us) const;
 
-    // set desired MPPT powered state (enabled/disabled)
-    virtual void mppt_set_powered_state(bool power_on) {};
+    // set desired powered state (enabled/disabled)
+    virtual void set_powered_state(bool power_on) {};
 
     // Update an ESC telemetry channel's power information
     void update_esc_telem_outbound();
@@ -128,6 +133,7 @@ struct BattMonitorScript_State {
     bool healthy; // True if communicating properly
     uint8_t cell_count; // Number of valid cells in state
     uint8_t capacity_remaining_pct=UINT8_MAX; // Remaining battery capacity in percent, 255 for invalid
+    uint8_t state_of_health_pct=UINT8_MAX; // Remaining battery health in percent, 255 for invalid
     uint16_t cell_voltages[32]; // allow script to have up to 32 cells, will be limited internally
     uint16_t cycle_count=UINT16_MAX; // Battery cycle count, 65535 for unavailable
     /*
@@ -141,3 +147,5 @@ struct BattMonitorScript_State {
     float temperature=nanf(""); // Battery temperature in degrees Celsius
 };
 #endif // AP_BATTERY_SCRIPTING_ENABLED
+
+#endif  // AP_BATTERY_ENABLED

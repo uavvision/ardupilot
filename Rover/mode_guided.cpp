@@ -53,7 +53,7 @@ void ModeGuided::update()
         {
             // stop vehicle if target not updated within 3 seconds
             if (have_attitude_target && (millis() - _des_att_time_ms) > 3000) {
-                gcs().send_text(MAV_SEVERITY_WARNING, "target not received last 3secs, stopping");
+                GCS_SEND_TEXT(MAV_SEVERITY_WARNING, "target not received last 3secs, stopping");
                 have_attitude_target = false;
             }
             if (have_attitude_target) {
@@ -77,12 +77,12 @@ void ModeGuided::update()
         {
             // stop vehicle if target not updated within 3 seconds
             if (have_attitude_target && (millis() - _des_att_time_ms) > 3000) {
-                gcs().send_text(MAV_SEVERITY_WARNING, "target not received last 3secs, stopping");
+                GCS_SEND_TEXT(MAV_SEVERITY_WARNING, "target not received last 3secs, stopping");
                 have_attitude_target = false;
             }
             if (have_attitude_target) {
                 // run steering and throttle controllers
-                float steering_out = attitude_control.get_steering_out_rate(radians(_desired_yaw_rate_cds / 100.0f),
+                float steering_out = attitude_control.get_steering_out_rate(radians(_desired_yaw_rate_cds * 0.01f),
                                                                             g2.motors.limit.steer_left,
                                                                             g2.motors.limit.steer_right,
                                                                             rover.G_Dt);
@@ -112,7 +112,7 @@ void ModeGuided::update()
             // handle timeout
             if (_have_strthr && (AP_HAL::millis() - _strthr_time_ms) > 3000) {
                 _have_strthr = false;
-                gcs().send_text(MAV_SEVERITY_WARNING, "target not received last 3secs, stopping");
+                GCS_SEND_TEXT(MAV_SEVERITY_WARNING, "target not received last 3secs, stopping");
             }
             if (_have_strthr) {
                 // pass latest steering and throttle directly to motors library
@@ -136,7 +136,7 @@ void ModeGuided::update()
             break;
 
         default:
-            gcs().send_text(MAV_SEVERITY_WARNING, "Unknown GUIDED mode");
+            GCS_SEND_TEXT(MAV_SEVERITY_WARNING, "Unknown GUIDED mode");
             break;
     }
 }
@@ -257,17 +257,17 @@ bool ModeGuided::reached_destination() const
 }
 
 // set desired speed in m/s
-bool ModeGuided::set_desired_speed(float speed)
+bool ModeGuided::set_desired_speed(float speed_ms)
 {
     switch (_guided_mode) {
     case SubMode::WP:
-        return g2.wp_nav.set_speed_max(speed);
+        return g2.wp_nav.set_speed_max(speed_ms);
     case SubMode::HeadingAndSpeed:
     case SubMode::TurnRateAndSpeed:
         // speed is set from mavlink message
         return false;
     case SubMode::Loiter:
-        return rover.mode_loiter.set_desired_speed(speed);
+        return rover.mode_loiter.set_desired_speed(speed_ms);
     case SubMode::SteeringAndThrottle:
     case SubMode::Stop:
         // no speed control
@@ -322,7 +322,9 @@ bool ModeGuided::set_desired_location(const Location &destination, Location next
     // handle guided specific initialisation and logging
     _guided_mode = SubMode::WP;
     send_notification = true;
+#if HAL_LOGGING_ENABLED
     rover.Log_Write_GuidedTarget((uint8_t)_guided_mode, Vector3f(destination.lat, destination.lng, 0), Vector3f(g2.wp_nav.get_speed_max(), 0.0f, 0.0f));
+#endif
     return true;
 }
 
@@ -338,8 +340,10 @@ void ModeGuided::set_desired_heading_and_speed(float yaw_angle_cd, float target_
     _desired_speed = target_speed;
     have_attitude_target = true;
 
+#if HAL_LOGGING_ENABLED
     // log new target
     rover.Log_Write_GuidedTarget((uint8_t)_guided_mode, Vector3f(_desired_yaw_cd, 0.0f, 0.0f), Vector3f(_desired_speed, 0.0f, 0.0f));
+#endif
 }
 
 void ModeGuided::set_desired_heading_delta_and_speed(float yaw_delta_cd, float target_speed)
@@ -364,8 +368,10 @@ void ModeGuided::set_desired_turn_rate_and_speed(float turn_rate_cds, float targ
     _desired_speed = target_speed;
     have_attitude_target = true;
 
+#if HAL_LOGGING_ENABLED
     // log new target
     rover.Log_Write_GuidedTarget((uint8_t)_guided_mode, Vector3f(_desired_yaw_rate_cds, 0.0f, 0.0f), Vector3f(_desired_speed, 0.0f, 0.0f));
+#endif
 }
 
 // set steering and throttle (both in the range -1 to +1)
@@ -437,5 +443,5 @@ bool ModeGuided::limit_breached() const
 // scurves provide path planning and object avoidance but cannot handle fast updates to the destination (for fast updates use position controller input shaping)
 bool ModeGuided::use_scurves_for_navigation() const
 {
-    return ((rover.g2.guided_options.get() & uint32_t(Options::SCurvesUsedForNavigation)) != 0);
+    return ((g2.guided_options.get() & uint32_t(Options::SCurvesUsedForNavigation)) != 0);
 }

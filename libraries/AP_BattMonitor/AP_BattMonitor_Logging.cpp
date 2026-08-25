@@ -1,6 +1,7 @@
+#include "AP_BattMonitor_config.h"
 #include <AP_Logger/AP_Logger_config.h>
 
-#if HAL_LOGGING_ENABLED
+#if AP_BATTERY_ENABLED && HAL_LOGGING_ENABLED
 
 #include "AP_BattMonitor_Backend.h"
 #include <AP_Logger/AP_Logger.h>
@@ -29,9 +30,9 @@ void AP_BattMonitor_Backend::Log_Write_BAT(const uint8_t instance, const uint64_
         instance            : instance,
         voltage             : _state.voltage,
         voltage_resting     : _state.voltage_resting_estimate,
-        current_amps        : has_curr ? _state.current_amps : AP::logger().quiet_nanf(),
-        current_total       : has_curr ? _state.consumed_mah : AP::logger().quiet_nanf(),
-        consumed_wh         : has_curr ? _state.consumed_wh : AP::logger().quiet_nanf(),
+        current_amps        : has_curr ? _state.current_amps : AP_Logger::quiet_nanf(),
+        current_total       : has_curr ? _state.consumed_mah : AP_Logger::quiet_nanf(),
+        consumed_wh         : has_curr ? _state.consumed_wh : AP_Logger::quiet_nanf(),
         temperature         : temperature_cd,
         resistance          : _state.resistance,
         rem_percent         : percent,
@@ -88,4 +89,4 @@ void AP_BattMonitor_Backend::Log_Write_BCL(const uint8_t instance, const uint64_
 #endif
 }
 
-#endif  // HAL_LOGGING_ENABLED
+#endif  // AP_BATTERY_ENABLED && HAL_LOGGING_ENABLED

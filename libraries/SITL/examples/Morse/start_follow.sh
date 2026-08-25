@@ -1,4 +1,4 @@
-#!/bin/bash
+#!/usr/bin/env bash
 
 # assume we start the script from the root directory
 ROOTDIR=$PWD
@@ -25,7 +25,7 @@ for i in $(seq 2); do
 
     # create default parameter file for the follower
     cat <<EOF > rov$i/follow.parm
-SYSID_THISMAV $SYSID
+MAV_SYSID $SYSID
 SERVO1_FUNCTION 73
 SERVO3_FUNCTION 74
 INITIAL_MODE 6

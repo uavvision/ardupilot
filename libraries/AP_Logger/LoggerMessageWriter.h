@@ -2,13 +2,14 @@
 
 #include "AP_Logger_Backend.h"
 #include <AP_Rally/AP_Rally.h>
+#include <AP_RTC/AP_RTC_config.h>
 
 class LoggerMessageWriter {
 public:
 
     virtual void reset() = 0;
     virtual void process() = 0;
-    virtual bool finished() { return _finished; }
+    bool finished() const { return _finished; }
 
     virtual void set_logger_backend(class AP_Logger_Backend *backend) {
         _logger_backend = backend;
@@ -37,6 +38,9 @@ private:
         PARAM_SPACE_USED,
         RC_PROTOCOL,
         RC_OUTPUT,
+#if AP_RTC_LOGGING_ENABLED
+        LOG_RTC_MSG,
+#endif  // AP_RTC_LOGGING_ENABLED
     };
     Stage stage;
 };

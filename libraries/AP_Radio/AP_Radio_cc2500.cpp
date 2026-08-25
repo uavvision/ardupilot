@@ -3,12 +3,13 @@
 
   Many thanks to the cleanflight and betaflight projects
  */
+#include "AP_Radio_config.h"
+
+#if AP_RADIO_CC2500_ENABLED
+
 #include <AP_HAL/AP_HAL.h>
 
 // #pragma GCC optimize("O0")
-
-#if CONFIG_HAL_BOARD == HAL_BOARD_CHIBIOS
-#if HAL_RCINPUT_WITH_AP_RADIO
 
 #include <AP_Math/AP_Math.h>
 #include "AP_Radio_cc2500.h"
@@ -29,7 +30,7 @@
 
 extern const AP_HAL::HAL& hal;
 
-#define Debug(level, fmt, args...)   do { if ((level) <= get_debug_level()) { gcs().send_text(MAV_SEVERITY_INFO, fmt, ##args); }} while (0)
+#define Debug(level, fmt, args...)   do { if ((level) <= get_debug_level()) { GCS_SEND_TEXT(MAV_SEVERITY_INFO, fmt, ##args); }} while (0)
 
 // object instance for trampoline
 AP_Radio_cc2500 *AP_Radio_cc2500::radio_singleton;
@@ -84,7 +85,7 @@ bool AP_Radio_cc2500::init(void)
 {
 #if CONFIG_HAL_BOARD == HAL_BOARD_CHIBIOS
     if (_irq_handler_ctx != nullptr) {
-        AP_HAL::panic("AP_Radio_cc2500: double instantiation of irq_handler\n");
+        AP_HAL::panic("AP_Radio_cc2500: double instantiation of irq_handler");
     }
     chVTObjectInit(&timeout_vt);
     _irq_handler_ctx = chThdCreateFromHeap(NULL,
@@ -652,8 +653,8 @@ static const uint8_t wifi_chan_map[14] = {
 void AP_Radio_cc2500::setup_hopping_table_SRT(void)
 {
     uint8_t val;
-    uint8_t channel = bindTxId[0] % 127;
-    uint8_t channel_spacing = bindTxId[1] % 127;
+    uint8_t channel = bindTxId[0] % INT8_MAX;
+    uint8_t channel_spacing = bindTxId[1] % INT8_MAX;
     uint8_t i;
     uint8_t wifi_chan = t_status.wifi_chan;
     uint8_t cc_wifi_mid, cc_wifi_low, cc_wifi_high;
@@ -1563,5 +1564,4 @@ void AP_Radio_cc2500::check_double_bind(void)
     radio_singleton->nextChannel(1);
 }
 
-#endif // HAL_RCINPUT_WITH_AP_RADIO
-#endif // CONFIG_HAL_BOARD == HAL_BOARD_CHIBIOS
+#endif  // AP_RADIO_CC2500_ENABLED

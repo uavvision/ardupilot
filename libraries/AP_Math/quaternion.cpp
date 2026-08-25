@@ -381,8 +381,8 @@ void QuaternionT<T>::from_rotation(enum Rotation rotation)
 
     case ROTATION_CUSTOM_1:
     case ROTATION_CUSTOM_2:
-#if !APM_BUILD_TYPE(APM_BUILD_AP_Periph)
-        // Do not support custom rotations on Periph
+#if AP_CUSTOMROTATIONS_ENABLED
+        // custom rotations not supported on eg. Periph by default
         AP::custom_rotations().from_rotation(rotation, *this);
         return;
 #endif
@@ -772,6 +772,16 @@ QuaternionT<T> &QuaternionT<T>::operator*=(const QuaternionT<T> &v)
     return *this;
 }
 
+// Note: Quaternions have an inverse, but do not have a single, universally agreed-upon
+// "division" definition like real numbers. Quaternion multiplication is non-commutative,
+// so the result of q1 / q2 can follow two equally valid conventions:
+// (1) q1 / q2 = q1 * q2^-1
+// (2) q1 / q2 = q2^-1 * q1
+// Here, we use the second definition, following MATLAB: q1 / q2 = q2^-1 * q1.
+// For detailed definitions, see:
+//    https://www.euclideanspace.com/maths/algebra/realNormedAlgebra/quaternions/arithmetic/index.htm
+//    https://www.mathworks.com/help/aerotbx/ug/quatdivide.html
+// Note: We assume q2 is already normalized (a unit quaternion).
 template <typename T>
 QuaternionT<T> QuaternionT<T>::operator/(const QuaternionT<T> &v) const
 {

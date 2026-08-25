@@ -30,6 +30,7 @@
 #include <AP_RCTelemetry/AP_CRSF_Telem.h>
 #include <AP_SerialManager/AP_SerialManager.h>
 
+
 #define CRSF_SUBSET_RC_STARTING_CHANNEL_BITS        5
 #define CRSF_SUBSET_RC_STARTING_CHANNEL_MASK        0x1F
 #define CRSF_SUBSET_RC_RES_CONFIGURATION_BITS       2
@@ -85,63 +86,11 @@ extern const AP_HAL::HAL& hal;
 
 //#define CRSF_DEBUG
 //#define CRSF_DEBUG_CHARS
-#ifdef CRSF_DEBUG
+//#define CRSF_DEBUG_TELEM
+//#define CRSF_DEBUG_PARAMS
+#if defined(CRSF_DEBUG) || defined(CRSF_DEBUG_TELEM) || defined(CRSF_DEBUG_PARAMS)
 # define debug(fmt, args...)	hal.console->printf("CRSF: " fmt "\n", ##args)
-static const char* get_frame_type(uint8_t byte, uint8_t subtype = 0)
-{
-    switch(byte) {
-    case AP_RCProtocol_CRSF::CRSF_FRAMETYPE_GPS:
-        return "GPS";
-    case AP_RCProtocol_CRSF::CRSF_FRAMETYPE_BATTERY_SENSOR:
-        return "BATTERY";
-    case AP_RCProtocol_CRSF::CRSF_FRAMETYPE_HEARTBEAT:
-        return "HEARTBEAT";
-    case AP_RCProtocol_CRSF::CRSF_FRAMETYPE_VTX:
-        return "VTX";
-    case AP_RCProtocol_CRSF::CRSF_FRAMETYPE_VTX_TELEM:
-        return "VTX_TELEM";
-    case AP_RCProtocol_CRSF::CRSF_FRAMETYPE_PARAM_DEVICE_PING:
-        return "PING";
-    case AP_RCProtocol_CRSF::CRSF_FRAMETYPE_COMMAND:
-        return "COMMAND";
-    case AP_RCProtocol_CRSF::CRSF_FRAMETYPE_ATTITUDE:
-        return "ATTITUDE";
-    case AP_RCProtocol_CRSF::CRSF_FRAMETYPE_FLIGHT_MODE:
-        return "FLIGHT_MODE";
-    case AP_RCProtocol_CRSF::CRSF_FRAMETYPE_PARAM_DEVICE_INFO:
-        return "DEVICE_INFO";
-    case AP_RCProtocol_CRSF::CRSF_FRAMETYPE_PARAMETER_READ:
-        return "PARAM_READ";
-    case AP_RCProtocol_CRSF::CRSF_FRAMETYPE_PARAMETER_SETTINGS_ENTRY:
-        return "SETTINGS_ENTRY";
-    case AP_RCProtocol_CRSF::CRSF_FRAMETYPE_LINK_STATISTICS:
-        return "LINK_STATS";
-    case AP_RCProtocol_CRSF::CRSF_FRAMETYPE_RC_CHANNELS_PACKED:
-        return "RC";
-    case AP_RCProtocol_CRSF::CRSF_FRAMETYPE_SUBSET_RC_CHANNELS_PACKED:
-        return "RCv3";
-    case AP_RCProtocol_CRSF::CRSF_FRAMETYPE_RC_CHANNELS_PACKED_11BIT:
-        return "RCv3_11BIT";
-    case AP_RCProtocol_CRSF::CRSF_FRAMETYPE_LINK_STATISTICS_RX:
-        return "LINK_STATSv3_RX";
-    case AP_RCProtocol_CRSF::CRSF_FRAMETYPE_LINK_STATISTICS_TX:
-        return "LINK_STATSv3_TX";
-    case AP_RCProtocol_CRSF::CRSF_FRAMETYPE_PARAMETER_WRITE:
-        return "UNKNOWN";
-    case AP_RCProtocol_CRSF::CRSF_FRAMETYPE_AP_CUSTOM_TELEM_LEGACY:
-    case AP_RCProtocol_CRSF::CRSF_FRAMETYPE_AP_CUSTOM_TELEM:
-        switch (subtype) {
-        case AP_RCProtocol_CRSF::CRSF_AP_CUSTOM_TELEM_SINGLE_PACKET_PASSTHROUGH:
-            return "AP_CUSTOM_SINGLE";
-        case AP_RCProtocol_CRSF::CRSF_AP_CUSTOM_TELEM_STATUS_TEXT:
-            return "AP_CUSTOM_TEXT";
-        case AP_RCProtocol_CRSF::CRSF_AP_CUSTOM_TELEM_MULTI_PACKET_PASSTHROUGH:
-            return "AP_CUSTOM_MULTI";
-        }
-        return "AP_CUSTOM";
-    }
-    return "UNKNOWN";
-}
+# define get_frame_type(byte, subtype) AP_CRSF_Protocol::get_frame_type(byte, subtype)
 #else
 # define debug(fmt, args...)	do {} while(0)
 #endif
@@ -160,7 +109,7 @@ static const char* get_frame_type(uint8_t byte, uint8_t subtype = 0)
 
 const uint16_t AP_RCProtocol_CRSF::RF_MODE_RATES[RFMode::RF_MODE_MAX_MODES] = {
     4, 50, 150, 250,    // CRSF
-    4, 25, 50, 100, 150, 200, 250, 500  // ELRS
+    4, 25, 50, 100, 100, 150, 200, 250, 333, 500, 250, 500, 500, 1000, 50  // ELRS
 };
 
 AP_RCProtocol_CRSF* AP_RCProtocol_CRSF::_singleton;
@@ -178,7 +127,7 @@ AP_RCProtocol_CRSF::AP_RCProtocol_CRSF(AP_RCProtocol &_frontend) : AP_RCProtocol
         _singleton = this;
     }
 #endif
-#if HAL_CRSF_TELEM_ENABLED && !APM_BUILD_TYPE(APM_BUILD_iofirmware) && !APM_BUILD_TYPE(APM_BUILD_UNKNOWN)
+#if HAL_CRSF_TELEM_ENABLED && !APM_BUILD_TYPE(APM_BUILD_UNKNOWN)
     _uart = AP::serialmanager().find_serial(AP_SerialManager::SerialProtocol_CRSF, 0);
     if (_uart) {
         start_uart();
@@ -204,7 +153,7 @@ const char* AP_RCProtocol_CRSF::get_protocol_string(ProtocolType protocol) const
 // return the link rate as defined by the LinkStatistics
 uint16_t AP_RCProtocol_CRSF::get_link_rate(ProtocolType protocol) const {
     if (protocol == ProtocolType::PROTOCOL_ELRS) {
-        return RF_MODE_RATES[_link_status.rf_mode + RFMode::ELRS_RF_MODE_4HZ];
+        return RF_MODE_RATES[_link_status.rf_mode + RFMode::CRSF_RF_MAX_MODES];
     } else if (protocol == ProtocolType::PROTOCOL_TRACER) {
         return 250;
     } else {
@@ -244,9 +193,9 @@ void AP_RCProtocol_CRSF::_process_byte(uint8_t byte)
     if (_frame_ofs == 0) {
         _start_frame_time_us = now;
     }
-    
+
     _frame_bytes[_frame_ofs++] = byte;
-    
+
     if (!check_frame(now)) {
         skip_to_next_frame(now);
     }
@@ -266,7 +215,7 @@ bool AP_RCProtocol_CRSF::check_frame(uint32_t timestamp_us)
         return true;
     }
 
-    if (_frame.device_address != DeviceAddress::CRSF_ADDRESS_FLIGHT_CONTROLLER) {
+    if (_frame.device_address != AP_CRSF_Protocol::CRSF_ADDRESS_FLIGHT_CONTROLLER) {
         return false;
     }
 
@@ -325,7 +274,7 @@ void AP_RCProtocol_CRSF::skip_to_next_frame(uint32_t timestamp_us)
     /*
       look for a frame header in the remaining bytes
      */
-    const uint8_t *new_header = (const uint8_t *)memchr(&_frame_bytes[1], DeviceAddress::CRSF_ADDRESS_FLIGHT_CONTROLLER, _frame_ofs - 1);
+    const uint8_t *new_header = (const uint8_t *)memchr(&_frame_bytes[1], AP_CRSF_Protocol::CRSF_ADDRESS_FLIGHT_CONTROLLER, _frame_ofs - 1);
     if (new_header == nullptr) {
         _frame_ofs = 0;
         return;
@@ -367,10 +316,18 @@ void AP_RCProtocol_CRSF::update(void)
 
     // never received RC frames, but have received CRSF frames so make sure we give the telemetry opportunity to run
     uint32_t now = AP_HAL::micros();
-    if (_last_frame_time_us > 0 && (!get_rc_input_count() || !is_tx_active())
+    if ((_last_frame_time_us > 0
+#if HAL_CRSF_TELEM_ENABLED
+         || bind_in_progress()
+#endif
+        ) && (!get_rc_input_count() || !is_tx_active())
         && now - _last_frame_time_us > CRSF_INTER_FRAME_TIME_US_250HZ) {
-        process_telemetry(false);
-        _last_frame_time_us = now;
+        // don't send telemetry unless the UART we are dealing with is configured to send it
+        AP_HAL::UARTDriver *uart = get_available_UART();
+        if (_uart || (uart && (uart->get_baud_rate() == CRSF_BAUDRATE || uart->get_baud_rate() == ELRS_BAUDRATE))) {
+            process_telemetry(false);
+            _last_frame_time_us = now;
+        }
     }
 
 #if AP_RC_CHANNEL_ENABLED
@@ -397,22 +354,33 @@ void AP_RCProtocol_CRSF::write_frame(Frame* frame)
     uart->write((uint8_t*)frame, frame->length + 2);
     uart->flush();
 
-#ifdef CRSF_DEBUG
-    hal.console->printf("CRSF: writing %s:", get_frame_type(frame->type, frame->payload[0]));
-    for (uint8_t i = 0; i < frame->length + 2; i++) {
-        uint8_t val = ((uint8_t*)frame)[i];
-#ifdef CRSF_DEBUG_CHARS
-        if (val >= 32 && val <= 126) {
-            hal.console->printf(" 0x%x '%c'", val, (char)val);
-        } else {
+#if defined(CRSF_DEBUG) || defined(CRSF_DEBUG_PARAMS)
+#ifdef CRSF_DEBUG_PARAMS
+    switch (frame->type) {
+        case AP_CRSF_Protocol::CRSF_FRAMETYPE_PARAMETER_SETTINGS_ENTRY:
+        case AP_CRSF_Protocol::CRSF_FRAMETYPE_PARAMETER_READ:
+        case AP_CRSF_Protocol::CRSF_FRAMETYPE_PARAMETER_WRITE:
+        case AP_CRSF_Protocol::CRSF_FRAMETYPE_COMMAND:
 #endif
-            hal.console->printf(" 0x%x", val);
+
+        hal.console->printf("CRSF: writing %s:", get_frame_type(frame->type, frame->payload[0]));
+        for (uint8_t i = 0; i < frame->length + 2; i++) {
+            uint8_t val = ((uint8_t*)frame)[i];
 #ifdef CRSF_DEBUG_CHARS
+            if (val >= 32 && val <= 126) {
+                hal.console->printf(" 0x%x '%c'", val, (char)val);
+            } else {
+#endif
+                hal.console->printf(" 0x%x", val);
+#ifdef CRSF_DEBUG_CHARS
+            }
+#endif
         }
-#endif
+        hal.console->printf("\n");
+#ifdef CRSF_DEBUG_PARAMS
     }
-    hal.console->printf("\n");
 #endif
+#endif // defined(CRSF_DEBUG) || defined(CRSF_DEBUG_PARAMS)
 }
 
 bool AP_RCProtocol_CRSF::decode_crsf_packet()
@@ -437,31 +405,55 @@ bool AP_RCProtocol_CRSF::decode_crsf_packet()
     bool rc_active = false;
 
     switch (_frame.type) {
-        case CRSF_FRAMETYPE_RC_CHANNELS_PACKED:
+        case AP_CRSF_Protocol::CRSF_FRAMETYPE_RC_CHANNELS_PACKED:
             // scale factors defined by TBS - TICKS_TO_US(x) ((x - 992) * 5 / 8 + 1500)
             decode_11bit_channels((const uint8_t*)(&_frame.payload), CRSF_MAX_CHANNELS, _channels, 5U, 8U, 880U);
             _crsf_v3_active = false;
             rc_active = !_uart; // only accept RC data if we are not in standalone mode
             break;
-        case CRSF_FRAMETYPE_LINK_STATISTICS:
+        case AP_CRSF_Protocol::CRSF_FRAMETYPE_LINK_STATISTICS:
             process_link_stats_frame((uint8_t*)&_frame.payload);
             break;
-        case CRSF_FRAMETYPE_SUBSET_RC_CHANNELS_PACKED:
+        case AP_CRSF_Protocol::CRSF_FRAMETYPE_SUBSET_RC_CHANNELS_PACKED:
             decode_variable_bit_channels((const uint8_t*)(&_frame.payload), _frame.length, CRSF_MAX_CHANNELS, _channels);
             _crsf_v3_active = true;
             rc_active = !_uart; // only accept RC data if we are not in standalone mode
             break;
-        case CRSF_FRAMETYPE_LINK_STATISTICS_RX:
+        case AP_CRSF_Protocol::CRSF_FRAMETYPE_LINK_STATISTICS_RX:
             process_link_stats_rx_frame((uint8_t*)&_frame.payload);
             break;
-        case CRSF_FRAMETYPE_LINK_STATISTICS_TX:
+        case AP_CRSF_Protocol::CRSF_FRAMETYPE_LINK_STATISTICS_TX:
             process_link_stats_tx_frame((uint8_t*)&_frame.payload);
             break;
         default:
             break;
     }
 #if HAL_CRSF_TELEM_ENABLED
-    if (AP_CRSF_Telem::process_frame(FrameType(_frame.type), (uint8_t*)&_frame.payload)) {
+    if (AP_CRSF_Telem::process_frame(FrameType(_frame.type), (uint8_t*)&_frame.payload, _frame.length - 2U)) {
+#if defined(CRSF_DEBUG_TELEM) || defined(CRSF_DEBUG_PARAMS)
+        switch (_frame.type) {
+            case AP_CRSF_Protocol::CRSF_FRAMETYPE_RC_CHANNELS_PACKED:
+            case AP_CRSF_Protocol::CRSF_FRAMETYPE_LINK_STATISTICS:
+            case AP_CRSF_Protocol::CRSF_FRAMETYPE_SUBSET_RC_CHANNELS_PACKED:
+            case AP_CRSF_Protocol::CRSF_FRAMETYPE_LINK_STATISTICS_RX:
+            case AP_CRSF_Protocol::CRSF_FRAMETYPE_LINK_STATISTICS_TX:
+                break;
+#ifdef CRSF_DEBUG_PARAMS
+            case AP_CRSF_Protocol::CRSF_FRAMETYPE_PARAMETER_SETTINGS_ENTRY:
+            case AP_CRSF_Protocol::CRSF_FRAMETYPE_PARAMETER_READ:
+            case AP_CRSF_Protocol::CRSF_FRAMETYPE_PARAMETER_WRITE:
+            case AP_CRSF_Protocol::CRSF_FRAMETYPE_COMMAND:
+#else
+            default:
+#endif
+                hal.console->printf("CRSF: received %s:", get_frame_type(_frame.type));
+                uint8_t* fptr = (uint8_t*)&_frame;
+                for (uint8_t i = 0; i < _frame.length + 2; i++) {
+                    hal.console->printf(" 0x%x", fptr[i]);
+                }
+                hal.console->printf("\n");
+        }
+#endif // defined(CRSF_DEBUG_TELEM) || defined(CRSF_DEBUG_PARAMS)
         process_telemetry();
     }
     // process any pending baudrate changes before reading another frame
@@ -561,7 +553,7 @@ bool AP_RCProtocol_CRSF::process_telemetry(bool check_constraint)
     }
 
     if (!telem_available) {
-#if HAL_CRSF_TELEM_ENABLED && !APM_BUILD_TYPE(APM_BUILD_iofirmware)
+#if HAL_CRSF_TELEM_ENABLED
         if (AP_CRSF_Telem::get_telem_data(&_telemetry_frame, is_tx_active())) {
             telem_available = true;
         } else {
@@ -578,6 +570,11 @@ bool AP_RCProtocol_CRSF::process_telemetry(bool check_constraint)
     return true;
 }
 
+#if AP_OSD_LINK_STATS_EXTENSIONS_ENABLED
+    // Define the static tx powers array
+    constexpr uint16_t AP_RCProtocol_CRSF::tx_powers[];
+#endif
+
 // process link statistics to get RSSI
 void AP_RCProtocol_CRSF::process_link_stats_frame(const void* data)
 {
@@ -590,6 +587,7 @@ void AP_RCProtocol_CRSF::process_link_stats_frame(const void* data)
         rssi_dbm = link->uplink_rssi_ant2;
     }
     _link_status.link_quality = link->uplink_status;
+
     if (_use_lq_for_rssi) {
         _link_status.rssi = derive_scaled_lq_value(link->uplink_status);
     } else{
@@ -604,7 +602,37 @@ void AP_RCProtocol_CRSF::process_link_stats_frame(const void* data)
         }
     }
 
-    _link_status.rf_mode = MIN(link->rf_mode, 7U);
+    // Define the max number of RFModes based on ELRS modes, which is larger than Crossfire
+    const uint8_t max_modes = (RFMode::RF_MODE_MAX_MODES - RFMode::CRSF_RF_MAX_MODES) - 1U; // Subtract 1 due to zero-indexing
+    _link_status.rf_mode = MIN(link->rf_mode, max_modes); // Cap to avoid memory spills in the conversion tables
+
+#if AP_OSD_LINK_STATS_EXTENSIONS_ENABLED
+    // Populate the extra data items
+    if (link->uplink_status > 0) {
+        _link_status.rssi_dbm = rssi_dbm;
+        _link_status.tx_power = -1;
+        if (link->uplink_tx_power < ARRAY_SIZE(AP_RCProtocol_CRSF::tx_powers)) {
+            _link_status.tx_power = AP_RCProtocol_CRSF::tx_powers[link->uplink_tx_power];
+        }
+        _link_status.snr = link->uplink_snr;
+        _link_status.active_antenna = link->active_antenna;
+    } else {
+        // This means LQ is zero, so set all values to "no signal" state
+        _link_status.rssi_dbm = -1;
+        _link_status.tx_power = -1;
+        _link_status.snr = INT8_MIN;
+        _link_status.active_antenna = -1;
+    }
+#endif
+
+    // Report to frontend
+    frontend._rc_link_status.link_quality = _link_status.link_quality;
+#if AP_OSD_LINK_STATS_EXTENSIONS_ENABLED
+    frontend._rc_link_status.rssi_dbm = _link_status.rssi_dbm;
+    frontend._rc_link_status.snr = _link_status.snr;
+    frontend._rc_link_status.tx_power = _link_status.tx_power;
+    frontend._rc_link_status.active_antenna = _link_status.active_antenna;
+#endif
 }
 
 // process link statistics to get RX RSSI
@@ -684,6 +712,28 @@ int16_t AP_RCProtocol_CRSF::derive_scaled_lq_value(uint8_t uplink_lq)
 {
     return int16_t(roundf(constrain_float(uplink_lq*2.5f,0,255)));
 }
+
+// start bind
+#if HAL_CRSF_TELEM_ENABLED
+void AP_RCProtocol_CRSF::start_bind(void)
+{
+    AP_CRSF_Telem* telem = AP::crsf_telem();
+    if (telem != nullptr) {
+        telem->start_bind();
+    }
+}
+
+bool AP_RCProtocol_CRSF::bind_in_progress(void)
+{
+#if !APM_BUILD_TYPE(APM_BUILD_UNKNOWN) && !APM_BUILD_TYPE(APM_BUILD_Replay)
+    AP_CRSF_Telem* telem = AP::crsf_telem();
+    if (telem != nullptr) {
+        return telem->bind_in_progress();
+    }
+#endif
+    return false;
+}
+#endif
 
 namespace AP {
     AP_RCProtocol_CRSF* crsf() {

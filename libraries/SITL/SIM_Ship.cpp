@@ -34,11 +34,36 @@ using namespace SITL;
 
 // SITL Ship parameters
 const AP_Param::GroupInfo ShipSim::var_info[] = {
+    // @Param: ENABLE
+    // @DisplayName: Ship landing Enable
+    // @Description: Enable ship landing simulation
+    // @Values: 0:Disable,1:Enabled
     AP_GROUPINFO("ENABLE",    1, ShipSim,  enable, 0),
+    // @Param: SPEED
+    // @DisplayName: Ship Speed
+    // @Description: Speed of the ship
+    // @Units: m/s
     AP_GROUPINFO("SPEED",     2, ShipSim,  speed, 3),
+    // @Param: PSIZE
+    // @DisplayName: Path Size
+    // @Description: Diameter of the circle the ship is traveling on
+    // @Units: m
     AP_GROUPINFO("PSIZE",     3, ShipSim,  path_size, 1000),
+    // @Param: SYSID
+    // @DisplayName: System ID
+    // @Description: System ID of the ship
+    // @Range: 1 255
     AP_GROUPINFO("SYSID",     4, ShipSim,  sys_id, 17),
+    // @Param: DSIZE
+    // @DisplayName: Deck Size
+    // @Description: Size of the ship's deck
+    // @Units: m
     AP_GROUPINFO("DSIZE",     5, ShipSim,  deck_size, 10),
+    // @Param: OFS
+    // @DisplayName: Ship landing pad offset
+    // @Description: Defines the offset of the ship's landing pad w.r.t. the ship's origin, i.e. where the beacon is placed on the ship
+    // @Units: m
+    // @Vector3Parameter: 1
     AP_GROUPINFO("OFS",       7, ShipSim,  offset, 0),
     AP_GROUPEND
 };
@@ -185,8 +210,13 @@ void ShipSim::send_report(void)
         last_heartbeat_ms = now;
 
         const mavlink_heartbeat_t heartbeat{
+        custom_mode: 0,
         type : MAV_TYPE_SURFACE_BOAT,
-        autopilot : MAV_AUTOPILOT_INVALID};
+        autopilot : MAV_AUTOPILOT_INVALID,
+        base_mode: 0,
+        system_status: 0,
+        mavlink_version: 0,
+        };
 
         mavlink_message_t msg;
         mavlink_msg_heartbeat_encode_status(
@@ -224,15 +254,15 @@ void ShipSim::send_report(void)
         vel.rotate(radians(ship.heading_deg));
 
         const mavlink_global_position_int_t global_position_int{
-            now,
-            loc.lat,
-            loc.lng,
-            alt_mm,
-            0,
-            int16_t(vel.x*100),
-            int16_t(vel.y*100),
-            0,
-            uint16_t(ship.heading_deg*100)
+        time_boot_ms: now,
+        lat: loc.lat,
+        lon: loc.lng,
+        alt: alt_mm,
+        relative_alt: 0,
+        vx: int16_t(vel.x*100),
+        vy: int16_t(vel.y*100),
+        vz: 0,
+        hdg: uint16_t(ship.heading_deg*100)
         };
         mavlink_message_t msg;
         mavlink_msg_global_position_int_encode_status(
@@ -250,9 +280,13 @@ void ShipSim::send_report(void)
 
     { // also set ATTITUDE so MissionPlanner can display ship orientation
         const mavlink_attitude_t attitude{
-            now,
-            0, 0, float(radians(ship.heading_deg)),
-            0, 0, ship.yaw_rate
+        time_boot_ms: now,
+        roll: 0,
+        pitch: 0,
+        yaw: float(radians(ship.heading_deg)),
+        rollspeed: 0,
+        pitchspeed: 0,
+        yawspeed: ship.yaw_rate
         };
         mavlink_message_t msg;
         mavlink_msg_attitude_encode_status(
@@ -269,4 +303,4 @@ void ShipSim::send_report(void)
     }
 }
 
-#endif
+#endif  // AP_SIM_SHIP_ENABLED

@@ -19,8 +19,10 @@
 #include <AP_HAL/AP_HAL.h>                                      //This is a common Hardware Abstraction Layer.
 #include <AP_GPS/AP_GPS.h>
 #include <GCS_MAVLink/GCS_Dummy.h>
+#include <AP_Logger/AP_Logger.h>
 #include <AP_Notify/AP_Notify.h>
 #include <AP_Notify/AP_BoardLED.h>
+#include <AP_RTC/AP_RTC.h>
 #include <AP_SerialManager/AP_SerialManager.h>
 #include <AP_BoardConfig/AP_BoardConfig.h>
 #include <SITL/SITL.h>
@@ -33,20 +35,26 @@ const AP_HAL::HAL& hal = AP_HAL::get_HAL();                     //Declare "hal" 
 
 static AP_BoardConfig board_config;
 
+#if AP_NOTIFY_GPIO_LED_3_ENABLED
 // create board led object
 AP_BoardLED board_led;
+#endif
 
 // create fake gcs object
 GCS_Dummy _gcs;                                                 //gcs stands for Ground Control Station
-
-const AP_Param::GroupInfo GCS_MAVLINK_Parameters::var_info[] = {
-        AP_GROUPEND
-};
 
 #if AP_SIM_ENABLED
 SITL::SIM sitl;
 AP_Baro baro;
 AP_Scheduler scheduler;
+#endif
+
+#if AP_RTC_ENABLED
+AP_RTC rtc;
+#endif
+
+#if HAL_LOGGING_ENABLED
+AP_Logger logger;
 #endif
 
 // This example uses GPS system. Create it.
@@ -59,14 +67,20 @@ void setup()
 {
     hal.console->printf("GPS AUTO library test\n");
 
+#if AP_SIM_ENABLED
+    sitl.init();
+#endif  // AP_SIM_ENABLED
+
     board_config.init();
 
+#if AP_NOTIFY_GPIO_LED_3_ENABLED
     // Initialise the leds
     board_led.init();
+#endif
 
     // Initialize the UART for GPS system
     serial_manager.init();
-    gps.init(serial_manager);
+    gps.init();
 }
 
 

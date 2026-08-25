@@ -5,14 +5,6 @@ static const StorageAccess wp_storage(StorageManager::StorageMission);
 
 void Tracker::init_ardupilot()
 {
-    // initialise stats module
-    stats.init();
-
-    BoardConfig.init();
-#if HAL_MAX_CAN_PROTOCOL_DRIVERS
-    can_mgr.init();
-#endif
-
     // initialise notify
     notify.init();
     AP_Notify::flags.pre_arm_check = true;
@@ -32,21 +24,13 @@ void Tracker::init_ardupilot()
     // try to initialise stream rates in the main loop.
     gcs().update_send();
 
-#if HAL_LOGGING_ENABLED
-    log_init();
-#endif
-
-#if AP_SCRIPTING_ENABLED
-    scripting.init();
-#endif // AP_SCRIPTING_ENABLED
-
     // initialise compass
     AP::compass().set_log_bit(MASK_LOG_COMPASS);
     AP::compass().init();
 
     // GPS Initialization
     gps.set_log_gps_bit(MASK_LOG_GPS);
-    gps.init(serial_manager);
+    gps.init();
 
     ahrs.init();
     ahrs.set_fly_forward(false);
@@ -132,7 +116,12 @@ bool Tracker::set_home_eeprom(const Location &temp)
     return true;
 }
 
-bool Tracker::set_home(const Location &temp)
+bool Tracker::set_home_to_current_location(bool lock)
+{
+    return set_home(AP::gps().location(), lock);
+}
+
+bool Tracker::set_home(const Location &temp, bool lock)
 {
     // check EKF origin has been set
     Location ekf_origin;
@@ -201,7 +190,7 @@ void Tracker::set_mode(Mode &newmode, const ModeReason reason)
 #endif
     gcs().send_message(MSG_HEARTBEAT);
 
-    nav_status.bearing = ahrs.yaw_sensor * 0.01f;
+    nav_status.bearing = ahrs.get_yaw_deg();
 }
 
 bool Tracker::set_mode(const uint8_t new_mode, const ModeReason reason)
@@ -258,7 +247,7 @@ bool Tracker::should_log(uint32_t mask)
 bool AP_AdvancedFailsafe::gcs_terminate(bool should_terminate, const char *reason) {return false;}
 AP_AdvancedFailsafe *AP::advancedfailsafe() { return nullptr; }
 #endif  // AP_ADVANCEDFAILSAFE_ENABLED
-#if HAL_ADSB_ENABLED
+#if AP_ADSB_AVOIDANCE_ENABLED
 // dummy method to avoid linking AP_Avoidance
 AP_Avoidance *AP::ap_avoidance() { return nullptr; }
 #endif

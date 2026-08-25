@@ -76,19 +76,19 @@ public:
     T        x, y, z;
 
     // trivial ctor
-    constexpr Vector3<T>()
+    constexpr Vector3()
         : x(0)
         , y(0)
         , z(0) {}
 
     // setting ctor
-    constexpr Vector3<T>(const T x0, const T y0, const T z0)
+    constexpr Vector3(const T x0, const T y0, const T z0)
         : x(x0)
         , y(y0)
         , z(z0) {}
 
     //Create a Vector3 from a Vector2 with z
-    constexpr Vector3<T>(const Vector2<T> &v0, const T z0)
+    constexpr Vector3(const Vector2<T> &v0, const T z0)
         : x(v0.x)
         , y(v0.y)
         , z(z0) {}
@@ -287,10 +287,8 @@ public:
         return Vector3<T>{y,x,-z};
     }
 
-    // given a position p1 and a velocity v1 produce a vector
-    // perpendicular to v1 maximising distance from p1.  If p1 is the
-    // zero vector the return from the function will always be the
-    // zero vector - that should be checked for.
+    // Returns the component of p1 perpendicular to v1 (i.e., p1 projected
+    // onto the plane orthogonal to v1). Returns zero if p1 is zero.
     static Vector3<T> perpendicular(const Vector3<T> &p1, const Vector3<T> &v1)
     {
         const T d = p1 * v1;

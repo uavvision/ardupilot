@@ -26,9 +26,9 @@ using namespace SITL;
 MultiCopter::MultiCopter(const char *frame_str) :
     Aircraft(frame_str)
 {
-    frame = Frame::find_frame(frame_str);
+    frame = Frame::create_frame(frame_str);
     if (frame == nullptr) {
-        printf("Frame '%s' not found", frame_str);
+        printf("Frame '%s' not found or insufficient memory", frame_str);
         exit(1);
     }
 
@@ -48,8 +48,11 @@ void MultiCopter::calculate_forces(const struct sitl_input &input, Vector3f &rot
 
     add_shove_forces(rot_accel, body_accel);
     add_twist_forces(rot_accel);
+
+    // add forces from slung payload or tether payload
+    add_external_forces(body_accel);
 }
-    
+
 /*
   update the multicopter simulation by one time step
  */
@@ -61,6 +64,11 @@ void MultiCopter::update(const struct sitl_input &input)
     Vector3f rot_accel;
 
     calculate_forces(input, rot_accel, accel_body);
+    // simulated clamp holding vehicle down
+    if (clamp.clamped(*this, input)) {
+        rot_accel.zero();
+        accel_body.zero();
+    }
 
     // estimate voltage and current
     frame->current_and_voltage(battery_voltage, battery_current);

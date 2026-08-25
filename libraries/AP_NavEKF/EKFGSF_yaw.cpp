@@ -1,7 +1,7 @@
 /*
   Definition of functions used to provide a backup estimate of yaw angle
   that doesn't use a magnetometer. Uses a bank of 3-state EKF's organised
-  as a Guassian sum filter where states are velocity N,E (m/s) and yaw angle (rad)
+  as a Gaussian sum filter where states are velocity N,E (m/s) and yaw angle (rad)
 
   Written by Paul Riseborough <p_riseborough@live.com.au>
 
@@ -69,21 +69,21 @@ void EKFGSF_yaw::update(const Vector3F &delAng,
 
     // Calculate AHRS acceleration fusion gain using a quadratic weighting function that is unity at 1g
     // and zero at the min and max g limits. This reduces the effect of large g transients on the attitude
-    // esitmates.
+    // estimates.
     ftype EKFGSF_ahrs_ng = ahrs_accel_norm / GRAVITY_MSS;
     if (EKFGSF_ahrs_ng > 1.0f) {
         if (is_positive(true_airspeed)) {
             // When flying in fixed wing mode we need to allow for more positive g due to coordinated turns
             // Gain varies from unity at 1g to zero at 2g
-            accel_gain = EKFGSF_tiltGain * sq(2.0f - EKFGSF_ahrs_ng);
-        } else if (accel_gain <= 1.5f) {
+            accel_gain = EKFGSF_tiltGain * sq(MAX(2.0f - EKFGSF_ahrs_ng, 0.0f));
+        } else if (EKFGSF_ahrs_ng <= 1.5f) {
             // Gain varies from unity at 1g to zero at 1.5g
             accel_gain = EKFGSF_tiltGain * sq(3.0f - 2.0f * EKFGSF_ahrs_ng);
         } else {
             // Gain is zero above max g
             accel_gain = 0.0f;
         }
-    } else if (accel_gain > 0.5f) {
+    } else if (EKFGSF_ahrs_ng > 0.5f) {
         // Gain varies from zero at 0.5g to unity at 1g
         accel_gain = EKFGSF_tiltGain * sq(2.0f * EKFGSF_ahrs_ng - 1.0f);
     } else {
@@ -103,7 +103,7 @@ void EKFGSF_yaw::update(const Vector3F &delAng,
     // Calculate a composite yaw as a weighted average of the states for each model.
     // To avoid issues with angle wrapping, the yaw state is converted to a vector with legnth
     // equal to the weighting value before it is summed.
-    Vector2F yaw_vector = {};
+    Vector2F yaw_vector;
     for (uint8_t mdl_idx = 0; mdl_idx < N_MODELS_EKFGSF; mdl_idx++) {
         yaw_vector[0] += GSF.weights[mdl_idx] * cosF(EKF[mdl_idx].X[2]);
         yaw_vector[1] += GSF.weights[mdl_idx] * sinF(EKF[mdl_idx].X[2]);
@@ -196,15 +196,15 @@ void EKFGSF_yaw::predictAHRS(const uint8_t mdl_idx)
     // Generate attitude solution using simple complementary filter for the selected model
 
     // Calculate 'k' unit vector of earth frame rotated into body frame
-    const Vector3F k(AHRS[mdl_idx].R[2][0], AHRS[mdl_idx].R[2][1], AHRS[mdl_idx].R[2][2]);
+    const Vector3F k{AHRS[mdl_idx].R[2][0], AHRS[mdl_idx].R[2][1], AHRS[mdl_idx].R[2][2]};
 
     // Calculate angular rate vector in rad/sec averaged across last sample interval
-    Vector3F ang_rate_delayed_raw = delta_angle / angle_dt;
+    const Vector3F ang_rate_delayed_raw { delta_angle / angle_dt };
 
     // Perform angular rate correction using accel data and reduce correction as accel magnitude moves away from 1 g (reduces drift when vehicle picked up and moved).
     // During fixed wing flight, compensate for centripetal acceleration assuming coordinated turns and X axis forward
 
-    Vector3F tilt_error_gyro_correction = {}; // (rad/sec)
+    Vector3F tilt_error_gyro_correction; // (rad/sec)
 
     if (accel_gain > 0.0f) {
 
@@ -213,8 +213,11 @@ void EKFGSF_yaw::predictAHRS(const uint8_t mdl_idx)
         if (is_positive(true_airspeed)) {
             // Calculate centripetal acceleration in body frame from cross product of body rate and body frame airspeed vector
             // NOTE: this assumes X axis is aligned with airspeed vector
-            Vector3F centripetal_accel_vec_bf = Vector3F(0.0f, ang_rate_delayed_raw[2] * true_airspeed, - ang_rate_delayed_raw[1] * true_airspeed);
-
+            const Vector3F centripetal_accel_vec_bf {
+                0.0f,
+                ang_rate_delayed_raw[2] * true_airspeed,
+                - ang_rate_delayed_raw[1] * true_airspeed
+            };
             // Correct measured accel for centripetal acceleration
             accel -= centripetal_accel_vec_bf;
         }
@@ -391,7 +394,7 @@ void EKFGSF_yaw::predict(const uint8_t mdl_idx)
 }
 
 // Update EKF states and covariance for specified model index using velocity measurement
-// Returns false if the sttae and covariance correction failed
+// Returns false if the state and covariance correction failed
 bool EKFGSF_yaw::correct(const uint8_t mdl_idx, const Vector2F &vel, const ftype velObsVar)
 {
     // calculate velocity observation innovations

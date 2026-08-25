@@ -70,7 +70,7 @@ public:
     virtual void     set_system_initialized() = 0;
     virtual bool     is_system_initialized() = 0;
 
-    virtual void     reboot(bool hold_in_bootloader) = 0;
+    virtual void     reboot(bool hold_in_bootloader = false) = 0;
 
     /**
        optional function to stop clock at a given time, used by log replay
@@ -129,7 +129,7 @@ public:
 private:
 
     AP_HAL::Proc _delay_cb;
-    bool _in_delay_callback : 1;
+    bool _in_delay_callback;
 
 };
 

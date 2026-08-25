@@ -31,23 +31,23 @@
 --
 -- Testing in SITL:
 --   a. set map setshowsimpos 1 (to allow seeing where vehicle really is in simulator even with GPS disabled)
---   b. set SIM_GPS_DISABLE = 1 to disable GPS (confirm dead reckoning begins)
---   c. set SIM_GPS_DISABLE = 0 to re-enable GPS
+--   b. set SIM_GPS1_ENABLE = 0 to disable GPS (confirm dead reckoning begins)
+--   c. set SIM_GPS1_ENABLE = 1 to re-enable GPS
 --   d. set SIM_GPS_NUMSAT = 3 to lower simulated satellite count to confirm script triggers
 --   e. set DR_GPS_SACC_MAX = 0.01 to lower the threshold and trigger below the simulator value which is 0.04 (remember to set this back after testing!)
 --
 -- Test on a real vehicle:
 --   A. set DR_FLY_TIMEOUT to a low value (e.g. 5 seconds)
 --   B. fly the vehicle at least DR_DIST_MIN meters from home and confirm the "DR: activated!" message is displayed
---   C. set GPS_TYPE = 0 to disable GPS and confirm the vehicle begins deadreckoning after a few seconds
---   D. restore GPS_TYPE to its original value (normally 1) and confirm the vehicle switches to DR_NEXT_MODE
+--   C. set GPS1_TYPE = 0 to disable GPS and confirm the vehicle begins deadreckoning after a few seconds
+--   D. restore GPS1_TYPE to its original value (normally 1) and confirm the vehicle switches to DR_NEXT_MODE
 --   E. restore DR_FLY_TIMEOUT to a higher value for real-world use
--- Note: Instaed of setting GPS_TYPE, an auxiliary function switch can be setup to disable the GPS (e.g. RC9_OPTION = 65/"Disable GPS")
+-- Note: Instaed of setting GPS1_TYPE, an auxiliary function switch can be setup to disable the GPS (e.g. RC9_OPTION = 65/"Disable GPS")
 --
 -- Testing that it does not require RC (in SITL):
 --   a. set FS_OPTIONS's "Continue if in Guided on RC failsafe" bit
 --   b. set FS_GCS_ENABLE = 1 (to enable GCS failsafe otherwise RC failsafe will trigger anyway)
---   c. optionally set SYSID_MYGCS = 77 (or almost any other unused system id) to trick the above check so that GCS failsafe can really be disabled
+--   c. optionally set MAV_GCS_SYSID = 77 (or almost any other unused system id) to trick the above check so that GCS failsafe can really be disabled
 --   d. set SIM_RC_FAIL = 1 (to simulate RC failure, note vehicle keeps flying)
 --   e. set SIM_RC_FAIL = 0 (to simulate RC recovery)
 --
@@ -55,6 +55,9 @@
 --   a. SIM_WIND_DIR <-- sets direction wind is coming from
 --   b. SIM_WIND_SPD <-- sets wind speed in m/s
 --
+
+---@diagnostic disable: param-type-mismatch
+---@diagnostic disable: cast-local-type
 
 -- create and initialise parameters
 local PARAM_TABLE_KEY = 86  -- parameter table key must be used by only one script on a particular flight controller
@@ -153,8 +156,8 @@ local fly_timeoout = Parameter("DR_FLY_TIMEOUT")       -- deadreckoning timeout 
   // @User: Standard
 --]]
 local next_mode = Parameter("DR_NEXT_MODE")            -- mode to switch to after GPS recovers or timeout elapses
-local wpnav_speedup = Parameter("WPNAV_SPEED_UP")      -- maximum climb rate from WPNAV_SPEED_UP
-local wpnav_accel_z = Parameter("WPNAV_ACCEL_Z")       -- maximum vertical acceleration from WPNAV_ACCEL_Z
+local wp_speed_up = Parameter("WP_SPD_UP")             -- maximum climb rate in m/s from WP_SPD_UP
+local wp_accel_z = Parameter("WP_ACC_Z")               -- maximum vertical acceleration in m/s from WP_ACC_Z
 
 -- modes deadreckoning may be activated from
 -- comment out lines below to remove protection from these modes
@@ -314,7 +317,7 @@ function update()
       -- change to Guided_NoGPS and initialise stage2
       if (vehicle:set_mode(copter_guided_nogps_mode)) then
         flight_stage = 2
-        target_yaw = math.deg(ahrs:get_yaw())
+        target_yaw = math.deg(ahrs:get_yaw_rad())
         stage2_start_time_ms = now_ms
       else
         -- warn user of unexpected failure
@@ -372,9 +375,9 @@ function update()
       if curr_alt_below_home then
         local target_alt_above_vehicle = fly_alt_min:get() + curr_alt_below_home
         if target_alt_above_vehicle > 0 then
-          -- climb at up to 1m/s towards target above vehicle.  climb rate change is limited by WPNAV_ACCEL_Z
-          local climb_rate_chg_max = interval_ms * 0.001 * (wpnav_accel_z:get() * 0.01)
-          climb_rate = math.min(target_alt_above_vehicle * 0.1, wpnav_speedup:get() * 0.01, climb_rate + climb_rate_chg_max)
+          -- climb at up to 1m/s towards target above vehicle.  climb rate change is limited by WP_ACC_Z
+          local climb_rate_chg_max = interval_ms * 0.001 * wp_accel_z:get()
+          climb_rate = math.min(target_alt_above_vehicle * 0.1, wp_speed_up:get(), climb_rate + climb_rate_chg_max)
         end
       end
     end

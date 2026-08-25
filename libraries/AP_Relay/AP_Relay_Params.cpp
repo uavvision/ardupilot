@@ -55,15 +55,23 @@ const AP_Param::GroupInfo AP_Relay_Params::var_info[] = {
     // @Values: 1013: DroneCAN Hardpoint ID 13
     // @Values: 1014: DroneCAN Hardpoint ID 14
     // @Values: 1015: DroneCAN Hardpoint ID 15
+    // @Range: -1 1015
     // @User: Standard
     AP_GROUPINFO("PIN", 2, AP_Relay_Params, pin, -1),
 
     // @Param: DEFAULT
     // @DisplayName: Relay default state
-    // @Description: Should the relay default to on or off, this only applies to RELAYx_FUNC "Relay" (1). All other uses will pick the appropriate default output state from within the controlling function's parameters.
+    // @Description: Should the relay default to on or off, this only applies to RELAYx_FUNC "Relay" (1). All other uses will pick the appropriate default output state from within the controlling function's parameters. Note that if INVERTED is set then the default is inverted.
     // @Values: 0: Off,1:On,2:NoChange
     // @User: Standard
     AP_GROUPINFO("DEFAULT", 3, AP_Relay_Params, default_state, (float)DefaultState::OFF),
+
+    // @Param: INVERTED
+    // @DisplayName: Relay invert output signal
+    // @Description: Should the relay output signal be inverted. If enabled, relay on would be pin low and relay off would be pin high. NOTE: this impact's DEFAULT.
+    // @Values: 0:Normal,1:Inverted
+    // @User: Standard
+    AP_GROUPINFO("INVERTED", 4, AP_Relay_Params, inverted, false),
 
     AP_GROUPEND
 

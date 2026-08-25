@@ -1,6 +1,8 @@
-#include "AP_BattMonitor_Scripting.h"
+#include "AP_BattMonitor_config.h"
 
 #if AP_BATTERY_SCRIPTING_ENABLED
+
+#include "AP_BattMonitor_Scripting.h"
 
 #define AP_BATT_MONITOR_SCRIPTING_TIMEOUT_US 5000000
 
@@ -61,6 +63,12 @@ void AP_BattMonitor_Scripting::read()
         _state.temperature = internal_state.temperature;
     }
 
+    // Set state of health if provided
+    _state.has_state_of_health_pct = internal_state.state_of_health_pct != UINT8_MAX;
+    if (_state.has_state_of_health_pct) {
+        _state.state_of_health_pct = internal_state.state_of_health_pct;
+    }
+
     _state.healthy = internal_state.healthy;
 
     // Update the timestamp (has to be done after the consumed_mah calculation)
@@ -81,4 +89,3 @@ bool AP_BattMonitor_Scripting::handle_scripting(const BattMonitorScript_State &b
 }
 
 #endif // AP_BATTERY_SCRIPTING_ENABLED
-

@@ -58,19 +58,19 @@
 #endif
 
 // Local modules
-#include "AP_Arming.h"
+#include "AP_Arming_Rover.h"
 #include "sailboat.h"
-#if ADVANCED_FAILSAFE == ENABLED
+#if AP_ROVER_ADVANCED_FAILSAFE_ENABLED
 #include "afs_rover.h"
 #endif
 #include "Parameters.h"
-#include "GCS_Mavlink.h"
+#include "GCS_MAVLink_Rover.h"
 #include "GCS_Rover.h"
 #include "AP_Rally.h"
 #if AC_PRECLAND_ENABLED
 #include <AC_PrecLand/AC_PrecLand.h>
 #endif
-#include "RC_Channel.h"                  // RC Channel Library
+#include "RC_Channel_Rover.h"                  // RC Channel Library
 
 #include "mode.h"
 
@@ -81,7 +81,7 @@ public:
     friend class ParametersG2;
     friend class AP_Rally_Rover;
     friend class AP_Arming_Rover;
-#if ADVANCED_FAILSAFE == ENABLED
+#if AP_ROVER_ADVANCED_FAILSAFE_ENABLED
     friend class AP_AdvancedFailsafe_Rover;
 #endif
 #if AP_EXTERNAL_CONTROL_ENABLED
@@ -99,11 +99,11 @@ public:
     friend class ModeManual;
     friend class ModeRTL;
     friend class ModeSmartRTL;
-#if MODE_FOLLOW_ENABLED == ENABLED
+#if MODE_FOLLOW_ENABLED
     friend class ModeFollow;
 #endif
     friend class ModeSimple;
-#if MODE_DOCK_ENABLED == ENABLED
+#if MODE_DOCK_ENABLED
     friend class ModeDock;
 #endif
 
@@ -136,18 +136,9 @@ private:
     RC_Channel *channel_pitch;
     RC_Channel *channel_walking_height;
 
-#if HAL_LOGGING_ENABLED
-    AP_Logger logger;
-#endif
-
     // flight modes convenience array
     AP_Int8 *modes;
     const uint8_t num_modes = 6;
-
-#if AP_RPM_ENABLED
-    // AP_RPM Module
-    AP_RPM rpm_sensor;
-#endif
 
     // Arming/Disarming management class
     AP_Arming_Rover arming;
@@ -210,8 +201,10 @@ private:
     // true if we have a position estimate from AHRS
     bool have_position;
 
+#if AP_RANGEFINDER_ENABLED
     // range finder last update for each instance (used for DPTH logging)
     uint32_t rangefinder_last_reading_ms[RANGEFINDER_MAX_INSTANCES];
+#endif
 
     // Ground speed
     // The amount current ground speed is below min ground speed.  meters per second
@@ -231,9 +224,6 @@ private:
 #if HAL_LOGGING_ENABLED
     static const LogStructure log_structure[];
 #endif
-
-    // time that rudder/steering arming has been running
-    uint32_t rudder_arm_timer;
 
     // latest wheel encoder values
     float wheel_encoder_last_distance_m[WHEELENCODER_MAX_INSTANCES];    // total distance recorded by wheel encoder (for reporting to GCS)
@@ -255,11 +245,11 @@ private:
     ModeSteering mode_steering;
     ModeRTL mode_rtl;
     ModeSmartRTL mode_smartrtl;
-#if MODE_FOLLOW_ENABLED == ENABLED
+#if MODE_FOLLOW_ENABLED
     ModeFollow mode_follow;
 #endif
     ModeSimple mode_simple;
-#if MODE_DOCK_ENABLED == ENABLED
+#if MODE_DOCK_ENABLED
     ModeDock mode_dock;
 #endif
 
@@ -272,23 +262,23 @@ private:
     } cruise_learn_t;
     cruise_learn_t cruise_learn;
 
-private:
-
     // Rover.cpp
-#if AP_SCRIPTING_ENABLED
+#if AP_SCRIPTING_ENABLED || AP_EXTERNAL_CONTROL_ENABLED
     bool set_target_location(const Location& target_loc) override;
-    bool set_target_velocity_NED(const Vector3f& vel_ned) override;
+#endif
+
+#if AP_SCRIPTING_ENABLED
+    bool set_target_velocity_NED(const Vector3f& vel_ned_ms, bool align_yaw_to_target) override;
     bool set_steering_and_throttle(float steering, float throttle) override;
     bool get_steering_and_throttle(float& steering, float& throttle) override;
     // set desired turn rate (degrees/sec) and speed (m/s). Used for scripting
-    bool set_desired_turn_rate_and_speed(float turn_rate, float speed) override;
-    bool set_desired_speed(float speed) override;
+    bool set_desired_turn_rate_and_speed(float turn_rate_degs, float speed_ms) override;
+    bool set_desired_speed(float speed_ms) override;
     bool get_control_output(AP_Vehicle::ControlOutput control_output, float &control_value) override;
     bool nav_scripting_enable(uint8_t mode) override;
     bool nav_script_time(uint16_t &id, uint8_t &cmd, float &arg1, float &arg2, int16_t &arg3, int16_t &arg4) override;
     void nav_script_time_done(uint16_t id) override;
 #endif // AP_SCRIPTING_ENABLED
-    void stats_update();
     void ahrs_update();
     void gcs_failsafe_check(void);
     void update_logging1(void);
@@ -301,12 +291,13 @@ private:
     bool is_balancebot() const;
 
     // commands.cpp
-    bool set_home_to_current_location(bool lock) WARN_IF_UNUSED;
-    bool set_home(const Location& loc, bool lock) WARN_IF_UNUSED;
+    bool set_home_to_current_location(bool lock) override WARN_IF_UNUSED;
+    bool set_home(const Location& loc, bool lock) override WARN_IF_UNUSED;
     void update_home();
 
     // crash_check.cpp
     void crash_check();
+    bool is_crashed() const override;
 
     // cruise_learn.cpp
     void cruise_learn_start();
@@ -324,15 +315,24 @@ private:
     // failsafe.cpp
     void failsafe_trigger(uint8_t failsafe_type, const char* type_str, bool on);
     void handle_battery_failsafe(const char* type_str, const int8_t action);
-#if ADVANCED_FAILSAFE == ENABLED
+#if AP_ROVER_ADVANCED_FAILSAFE_ENABLED
     void afs_fs_check(void);
 #endif
-
+#if AP_FENCE_ENABLED
     // fence.cpp
+    void fence_checks_async() override;
     void fence_check();
-
+#endif
     // GCS_Mavlink.cpp
     void send_wheel_encoder_distance(mavlink_channel_t chan);
+
+#if HAL_LOGGING_ENABLED
+    // methods for AP_Vehicle:
+    const AP_Int32 &get_log_bitmask() override { return g.log_bitmask; }
+    const struct LogStructure *get_log_structures() const override {
+        return log_structure;
+    }
+    uint8_t get_num_log_structures() const override;
 
     // Log.cpp
     void Log_Write_Attitude();
@@ -345,7 +345,7 @@ private:
     void Log_Write_RC(void);
     void Log_Write_Vehicle_Startup_Messages();
     void Log_Read(uint16_t log_num, uint16_t start_page, uint16_t end_page);
-    void log_init(void);
+#endif
 
     // mode.cpp
     Mode *mode_from_mode_num(enum Mode::Number num);
@@ -360,15 +360,15 @@ private:
     // radio.cpp
     void set_control_channels(void) override;
     void init_rc_in();
-    void rudder_arm_disarm_check();
     void read_radio();
     void radio_failsafe_check(uint16_t pwm);
 
     // sensors.cpp
     void update_compass(void);
-    void compass_save(void);
     void update_wheel_encoder();
+#if AP_RANGEFINDER_ENABLED
     void read_rangefinders(void);
+#endif
 
     // Steering.cpp
     void set_servos(void);
@@ -391,7 +391,10 @@ private:
         return control_mode == &mode_auto;
     }
 
-    void startup_INS_ground(void);
+    // Return mask of enabled modes, order does not matter, its just for tracking changes
+    uint32_t get_available_mode_enabled_mask() const override;
+
+    void startup_INS(void);
     void notify_mode(const Mode *new_mode);
     uint8_t check_digital_pin(uint8_t pin);
     bool should_log(uint32_t mask);
@@ -408,7 +411,8 @@ private:
         Hold          = 2,
         SmartRTL      = 3,
         SmartRTL_Hold = 4,
-        Terminate     = 5
+        Terminate     = 5,
+        Loiter_Hold   = 6,
     };
 
     enum class Failsafe_Options : uint32_t {
@@ -442,6 +446,14 @@ public:
 
     // Simple mode
     float simple_sin_yaw;
+
+#if AP_ROVER_AUTO_ARM_ONCE_ENABLED
+    struct {
+        uint32_t last_arm_attempt_ms;
+        bool done;
+    } auto_arm_once;
+    void handle_auto_arm_once();
+#endif  // AP_ROVER_AUTO_ARM_ONCE_ENABLED
 };
 
 extern Rover rover;

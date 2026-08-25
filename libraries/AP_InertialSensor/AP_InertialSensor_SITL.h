@@ -32,6 +32,7 @@ private:
     void generate_gyro();
     float get_temperature(void);
     void update_file();
+    void update_from_frame();
 #if AP_SIM_INS_FILE_ENABLED
     void read_gyro(const float* buf, uint8_t nsamples);
     void read_gyro_from_file();
@@ -45,10 +46,9 @@ private:
     const uint16_t gyro_sample_hz;
     const uint16_t accel_sample_hz;
 
-    uint8_t gyro_instance;
-    uint8_t accel_instance;
     uint64_t next_gyro_sample;
     uint64_t next_accel_sample;
+    uint64_t flightaxis_imu_frame_num;
     float gyro_time;
     float accel_time;
     float gyro_motor_phase[32];

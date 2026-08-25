@@ -5,8 +5,6 @@ AP_FLAKE8_CLEAN
 
 '''
 
-from __future__ import print_function
-
 import math
 import operator
 import os
@@ -175,6 +173,84 @@ class AutoTestTracker(vehicle_test_suite.TestSuite):
             "CPUFailsafe": " tracker doesn't have a CPU failsafe",
         }
 
+    def GPSForYaw(self):
+        '''Moving baseline GPS yaw'''
+        self.load_default_params_file("tracker-gps-for-yaw.parm")
+        self.reboot_sitl()
+
+        self.wait_gps_fix_type_gte(6, message_type="GPS2_RAW", verbose=True)
+        tstart = self.get_sim_time()
+        while True:
+            if self.get_sim_time_cached() - tstart > 20:
+                break
+            m_gps_raw = self.assert_receive_message("GPS2_RAW", verbose=True)
+            m_sim = self.assert_receive_message("SIMSTATE", verbose=True)
+            gps_raw_hdg = m_gps_raw.yaw * 0.01
+            sim_hdg = mavextra.wrap_360(math.degrees(m_sim.yaw))
+            if abs(gps_raw_hdg - sim_hdg) > 5:
+                raise NotAchievedException("GPS_RAW not tracking simstate yaw")
+            self.progress(f"yaw match ({gps_raw_hdg} vs {sim_hdg}")
+
+    def StationaryGlobalPositionIntAlt(self):
+        '''Test GLOBAL_POSITION_INT.alt is correct in stationary mode'''
+        # Disable GPS so the tracker stays in stationary mode (stationary=true).
+        # With GPS enabled the tracker gets a fix, sets stationary=false, and
+        # delegates to the base-class send_global_position_int() which is correct.
+        self.set_parameter("GPS1_TYPE", 0)
+        self.reboot_sitl()
+
+        # Set a known home position; Tracker::set_home() stores this in
+        # current_loc, which the stationary path uses directly.
+        home_loc = self.sitl_start_location()
+        self.set_home(home_loc)
+
+        self.assert_received_message_field_values("GLOBAL_POSITION_INT", {
+            "alt": int(home_loc.alt * 1000),
+        })
+
+    def LoggerMsgChunks(self):
+        '''create MSG dataflash entries for very long messages'''
+        self.assert_parameter_value('LOG_DISARMED', 1)
+        short_message_text = "This is a short message"
+        long_message_text = "This is undubitably a ridiculously verbose and needlessly wordy missive, unavoidably designed to exceed disappointingly minuscule log buffers"  # noqa:E501
+        self.send_statustext(short_message_text)
+        self.send_statustext(long_message_text)
+
+        self.delay_sim_time(10)
+        dfreader = self.dfreader_for_current_onboard_log()
+        self.reboot_sitl()
+
+        phase = "short"
+        seq = 0
+        received_long_message_text = ""
+        while True:
+            m = dfreader.recv_match(type='MSG')
+            if m is None:
+                break
+            self.progress(f"{m.Message=}")
+            msg = m.Message.lstrip("SRC=250/250:")
+            if phase == "short":
+                if msg != short_message_text:
+                    continue
+                self.progress("Received short message")
+                phase = "long"
+            elif phase == "long":
+                if m.Seq != seq:
+                    received_long_message_text = ""
+                    seq = 0
+                    if m.Seq != 0:
+                        raise NotAchievedException("Weird")
+                else:
+                    seq += 1
+                received_long_message_text += msg
+                self.progress(f"Text: {received_long_message_text}")
+                if received_long_message_text == long_message_text:
+                    phase = "done"
+                    break
+
+        if phase != "done":
+            raise NotAchievedException(f"Did not get message text; {phase=}")  # noqa:E501
+
     def tests(self):
         '''return list of all tests'''
         ret = super(AutoTestTracker, self).tests()
@@ -186,5 +262,8 @@ class AutoTestTracker(vehicle_test_suite.TestSuite):
             self.NMEAOutput,
             self.SCAN,
             self.BaseMessageSet,
+            self.GPSForYaw,
+            self.LoggerMsgChunks,
+            self.StationaryGlobalPositionIntAlt,
         ])
         return ret

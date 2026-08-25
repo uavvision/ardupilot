@@ -62,4 +62,108 @@ TEST(vsnprintf_Test, Basic)
     }
 }
 
+static const char* do_subnormal_format(uint32_t val_hex) {
+    // format float represented as a hex number long enough to see all digits
+
+    // note that something else is wrong here and all the strings should be the
+    // same width of 99 chars (or whatever the format string means)! when that
+    // is fixed, update the test and add an assert here.
+
+    static char buf[256];
+
+    float val;
+    static_assert(sizeof(uint32_t) == sizeof(float));
+    memcpy(&val, &val_hex, sizeof(float));
+
+    hal.util->snprintf(buf, ARRAY_SIZE(buf), "%.99f", val);
+
+    return buf;
+}
+
+TEST(vsnprintf_Test, SubnormalFormat)
+{
+    // arbitrary small number (1e-31)
+    // EXPECT_STREQ("0.000000000000000000000000000000099999998000000000000000000000000000000000000000000000000000000000000",
+    EXPECT_STREQ("0.0000000000000000000000000000001000000",
+        do_subnormal_format(0x0C01CEB3));
+
+    // smallest normal (1.1754944e-38)
+    // EXPECT_STREQ("0.000000000000000000000000000000000000011754944000000000000000000000000000000000000000000000000000000",
+    EXPECT_STREQ("0.00000000000000000000000000000000000001175494",
+        do_subnormal_format(0x00800000));
+
+    // largest subnormal (1.1754942e-38)
+    // EXPECT_STREQ("0.000000000000000000000000000000000000011754942000000000000000000000000000000000000000000000000000000",
+    EXPECT_STREQ("0.00000000000000000000000000000000000001175494", // !! same as above
+        do_subnormal_format(0x007FFFFF));
+
+    // moderate subnormal (1.1478e-41)
+    // EXPECT_STREQ("0.000000000000000000000000000000000000000011478036000000000000000000000000000000000000000000000000000",
+    EXPECT_STREQ("0.00000000000000000000000000000000000000001147804",
+        do_subnormal_format(0x00001FFF));
+
+    // smallest subnormal (1e-45)
+    // EXPECT_STREQ("0.000000000000000000000000000000000000000000001401290000000000000000000000000000000000000000000000000",
+    EXPECT_STREQ("0.00000000000000000000000000000000000000000000140130",
+        do_subnormal_format(0x00000001));
+
+    // zero
+    EXPECT_STREQ("0.000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000",
+        do_subnormal_format(0x00000000));
+}
+
+static const char* do_special_format(uint32_t val_hex) {
+    // format float represented as a hex number
+
+    static char buf[256];
+
+    float val;
+    static_assert(sizeof(uint32_t) == sizeof(float));
+    memcpy(&val, &val_hex, sizeof(float));
+
+    hal.util->snprintf(buf, ARRAY_SIZE(buf), "%f", val);
+
+    return buf;
+}
+
+TEST(vsnprintf_Test, SpecialFormat)
+{
+    // positive infinity
+    EXPECT_STREQ("inf", do_special_format(0x7F800000));
+
+    // negative infinity
+    EXPECT_STREQ("-inf", do_special_format(0xFF800000));
+
+    // signaling NaN with arbitrary payload A
+    EXPECT_STREQ("nan", do_special_format(0x7FF00800));
+
+    // signaling NaN with arbitrary payload B
+    EXPECT_STREQ("nan", do_special_format(0x7FF01230));
+
+    // quiet NaN with arbitrary payload A
+    EXPECT_STREQ("nan", do_special_format(0x7FB00800));
+
+    // quiet NaN with arbitrary payload B
+    EXPECT_STREQ("nan", do_special_format(0x7FB01230));
+
+    // negative signaling NaN with arbitrary payload A
+    EXPECT_STREQ("nan", do_special_format(0xFFF00800));
+
+    // negative signaling NaN with arbitrary payload B
+    EXPECT_STREQ("nan", do_special_format(0xFFF01230));
+
+    // negative quiet NaN with arbitrary payload A
+    EXPECT_STREQ("nan", do_special_format(0xFFB00800));
+
+    // negative quiet NaN with arbitrary payload B
+    EXPECT_STREQ("nan", do_special_format(0xFFB01230));
+
+    // largest NaN payload
+    EXPECT_STREQ("nan", do_special_format(0x7FFFFFFF));
+
+    // smallest NaN payload
+    EXPECT_STREQ("nan", do_special_format(0x7F800001));
+}
+
+
 AP_GTEST_MAIN()

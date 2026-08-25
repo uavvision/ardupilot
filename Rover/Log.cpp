@@ -7,8 +7,8 @@
 // Write an attitude packet
 void Rover::Log_Write_Attitude()
 {
-    float desired_pitch_cd = degrees(g2.attitude_control.get_desired_pitch()) * 100.0f;
-    const Vector3f targets(0.0f, desired_pitch_cd, 0.0f);
+    float desired_pitch = degrees(g2.attitude_control.get_desired_pitch());
+    const Vector3f targets(0.0f, desired_pitch, 0.0f);
 
     ahrs.Write_Attitude(targets);
 
@@ -24,11 +24,12 @@ void Rover::Log_Write_Attitude()
     }
 
     // log heel to sail control for sailboats
-    if (rover.g2.sailboat.sail_enabled()) {
+    if (g2.sailboat.sail_enabled()) {
         logger.Write_PID(LOG_PIDR_MSG, g2.attitude_control.get_sailboat_heel_pid().get_pid_info());
     }
 }
 
+#if AP_RANGEFINDER_ENABLED
 // Write a range finder depth message
 void Rover::Log_Write_Depth()
 {
@@ -78,11 +79,8 @@ void Rover::Log_Write_Depth()
                             (double)(s->distance()),
                             temp_C);
     }
-#if AP_RANGEFINDER_ENABLED
-    // send water depth and temp to ground station
-    gcs().send_message(MSG_WATER_DEPTH);
-#endif
 }
+#endif
 
 // guided mode logging
 struct PACKED log_GuidedTarget {
@@ -142,13 +140,13 @@ void Rover::Log_Write_Nav_Tuning()
 void Rover::Log_Write_Sail()
 {
     // only log sail if present
-    if (!rover.g2.sailboat.sail_enabled()) {
+    if (!g2.sailboat.sail_enabled()) {
         return;
     }
 
-    float wind_dir_tack = logger.quiet_nanf();
+    float wind_dir_tack = AP_Logger::quiet_nanf();
     uint8_t current_tack = 0;
-    if (rover.g2.windvane.enabled()) {
+    if (g2.windvane.enabled()) {
         wind_dir_tack = degrees(g2.windvane.get_tack_threshold_wind_dir_rad());
         current_tack = uint8_t(g2.windvane.get_current_tack());
     }
@@ -188,7 +186,7 @@ struct PACKED log_Steering {
 // Write a steering packet
 void Rover::Log_Write_Steering()
 {
-    float lat_accel = logger.quiet_nanf();
+    float lat_accel = AP_Logger::quiet_nanf();
     g2.attitude_control.get_lat_accel(lat_accel);
     struct log_Steering pkt = {
         LOG_PACKET_HEADER_INIT(LOG_STEERING_MSG),
@@ -217,7 +215,7 @@ struct PACKED log_Throttle {
 void Rover::Log_Write_Throttle()
 {
     const Vector3f accel = ins.get_accel();
-    float speed = logger.quiet_nanf();
+    float speed = AP_Logger::quiet_nanf();
     g2.attitude_control.get_forward_speed(speed);
     struct log_Throttle pkt = {
         LOG_PACKET_HEADER_INIT(LOG_THR_MSG),
@@ -235,9 +233,11 @@ void Rover::Log_Write_RC(void)
 {
     logger.Write_RCIN();
     logger.Write_RCOUT();
+#if AP_RSSI_ENABLED
     if (rssi.enabled()) {
         logger.Write_RSSI();
     }
+#endif
 }
 
 void Rover::Log_Write_Vehicle_Startup_Messages()
@@ -308,22 +308,9 @@ const LogStructure Rover::log_structure[] = {
       "GUIP",  "QBffffff",    "TimeUS,Type,pX,pY,pZ,vX,vY,vZ", "s-mmmnnn", "F-000000" },
 };
 
-void Rover::log_init(void)
+uint8_t Rover::get_num_log_structures() const
 {
-    logger.Init(log_structure, ARRAY_SIZE(log_structure));
+    return ARRAY_SIZE(log_structure);
 }
-
-#else  // LOGGING_ENABLED
-
-// dummy functions
-void Rover::Log_Write_Attitude() {}
-void Rover::Log_Write_Depth() {}
-void Rover::Log_Write_GuidedTarget(uint8_t target_type, const Vector3f& pos_target, const Vector3f& vel_target) {}
-void Rover::Log_Write_Nav_Tuning() {}
-void Rover::Log_Write_Sail() {}
-void Rover::Log_Write_Throttle() {}
-void Rover::Log_Write_RC(void) {}
-void Rover::Log_Write_Steering() {}
-void Rover::Log_Write_Vehicle_Startup_Messages() {}
 
 #endif  // LOGGING_ENABLED

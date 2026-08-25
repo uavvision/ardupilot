@@ -1,7 +1,61 @@
-#include "AP_Mount_Alexmos.h"
+#include "AP_Mount_config.h"
 
 #if HAL_MOUNT_ALEXMOS_ENABLED
+
+#include "AP_Mount_Alexmos.h"
+
 #include <AP_SerialManager/AP_SerialManager.h>
+
+//definition of the commands id for the Alexmos Serial Protocol
+#define CMD_READ_PARAMS 'R'
+#define CMD_WRITE_PARAMS 'W'
+#define CMD_REALTIME_DATA 'D'
+#define CMD_BOARD_INFO 'V'
+#define CMD_CALIB_ACC 'A'
+#define CMD_CALIB_GYRO 'g'
+#define CMD_CALIB_EXT_GAIN 'G'
+#define CMD_USE_DEFAULTS 'F'
+#define CMD_CALIB_POLES 'P'
+#define CMD_RESET 'r'
+#define CMD_HELPER_DATA 'H'
+#define CMD_CALIB_OFFSET 'O'
+#define CMD_CALIB_BAT 'B'
+#define CMD_MOTORS_ON 'M'
+#define CMD_MOTORS_OFF 'm'
+#define CMD_CONTROL 'C'
+#define CMD_TRIGGER_PIN 'T'
+#define CMD_EXECUTE_MENU 'E'
+#define CMD_GET_ANGLES 'I'
+#define CMD_CONFIRM 'C'
+// Board v3.x only
+#define CMD_BOARD_INFO_3 20
+#define CMD_READ_PARAMS_3 21
+#define CMD_WRITE_PARAMS_3 22
+#define CMD_REALTIME_DATA_3 23
+#define CMD_SELECT_IMU_3 24
+#define CMD_READ_PROFILE_NAMES 28
+#define CMD_WRITE_PROFILE_NAMES 29
+#define CMD_QUEUE_PARAMS_INFO_3 30
+#define CMD_SET_PARAMS_3 31
+#define CMD_SAVE_PARAMS_3 32
+#define CMD_READ_PARAMS_EXT 33
+#define CMD_WRITE_PARAMS_EXT 34
+#define CMD_AUTO_PID 35
+#define CMD_SERVO_OUT 36
+#define CMD_ERROR 255
+
+#define AP_MOUNT_ALEXMOS_MODE_NO_CONTROL 0
+#define AP_MOUNT_ALEXMOS_MODE_SPEED 1
+#define AP_MOUNT_ALEXMOS_MODE_ANGLE 2
+#define AP_MOUNT_ALEXMOS_MODE_SPEED_ANGLE 3
+#define AP_MOUNT_ALEXMOS_MODE_RC 4
+
+#define AP_MOUNT_ALEXMOS_SPEED 30 // deg/s
+
+#define INT14_DEGREES (360.0f / float(0x3FFF)) // 1 full rotation in degrees over 14 bit range
+#define VALUE_TO_DEGREE(d) (float(d)*INT14_DEGREES)
+#define DEGREE_TO_VALUE(d) ((int16_t)((float)(d)*(1.0f/INT14_DEGREES)))
+#define DEGREE_PER_SEC_TO_VALUE(d) ((int16_t)((float)(d)*(1.0f/0.1220740379f)))
 
 void AP_Mount_Alexmos::init()
 {
@@ -19,6 +73,8 @@ void AP_Mount_Alexmos::init()
 // update mount position - should be called periodically
 void AP_Mount_Alexmos::update()
 {
+    AP_Mount_Backend::update();
+
     if (!_initialised) {
         return;
     }
@@ -26,80 +82,10 @@ void AP_Mount_Alexmos::update()
     read_incoming(); // read the incoming messages from the gimbal
 
     // update based on mount mode
-    switch (get_mode()) {
-        // move mount to a "retracted" position.  we do not implement a separate servo based retract mechanism
-        case MAV_MOUNT_MODE_RETRACT: {
-            const Vector3f &target = _params.retract_angles.get();
-            mnt_target.target_type = MountTargetType::ANGLE;
-            mnt_target.angle_rad.set(target*DEG_TO_RAD, false);
-            break;
-        }
-
-        // move mount to a neutral position, typically pointing forward
-        case MAV_MOUNT_MODE_NEUTRAL: {
-            const Vector3f &target = _params.neutral_angles.get();
-            mnt_target.target_type = MountTargetType::ANGLE;
-            mnt_target.angle_rad.set(target*DEG_TO_RAD, false);
-            break;
-        }
-
-        // point to the angles given by a mavlink message
-        case MAV_MOUNT_MODE_MAVLINK_TARGETING:
-            // mavlink targets are stored while handling the incoming message
-            break;
-
-        // RC radio manual angle control, but with stabilization from the AHRS
-        case MAV_MOUNT_MODE_RC_TARGETING: {
-            // update targets using pilot's RC inputs
-            MountTarget rc_target;
-            get_rc_target(mnt_target.target_type, rc_target);
-            switch (mnt_target.target_type) {
-            case MountTargetType::ANGLE:
-                mnt_target.angle_rad = rc_target;
-                break;
-            case MountTargetType::RATE:
-                mnt_target.rate_rads = rc_target;
-                break;
-            }
-            break;
-        }
-
-        // point mount to a GPS point given by the mission planner
-        case MAV_MOUNT_MODE_GPS_POINT:
-            if (get_angle_target_to_roi(mnt_target.angle_rad)) {
-                mnt_target.target_type = MountTargetType::ANGLE;
-            }
-            break;
-
-        // point mount to Home location
-        case MAV_MOUNT_MODE_HOME_LOCATION:
-            if (get_angle_target_to_home(mnt_target.angle_rad)) {
-                mnt_target.target_type = MountTargetType::ANGLE;
-            }
-            break;
-
-        // point mount to another vehicle
-        case MAV_MOUNT_MODE_SYSID_TARGET:
-            if (get_angle_target_to_sysid(mnt_target.angle_rad)) {
-                mnt_target.target_type = MountTargetType::ANGLE;
-            }
-            break;
-
-        default:
-            // we do not know this mode so do nothing
-            break;
-    }
+    update_mnt_target();
 
     // send target angles or rates depending on the target type
-    switch (mnt_target.target_type) {
-        case MountTargetType::RATE:
-            update_angle_target_from_rate(mnt_target.rate_rads, mnt_target.angle_rad);
-            FALLTHROUGH;
-        case MountTargetType::ANGLE:
-            // send latest angle targets to gimbal
-            control_axis(mnt_target.angle_rad);
-            break;
-    }
+    send_target_to_gimbal();
 }
 
 // has_pan_control - returns true if this mount can control its pan (required for multicopters)
@@ -161,7 +147,7 @@ void AP_Mount_Alexmos::get_boardinfo()
 /*
   control_axis : send new angle target to the gimbal at a fixed speed of 30 deg/s
 */
-void AP_Mount_Alexmos::control_axis(const MountTarget& angle_target_rad)
+void AP_Mount_Alexmos::send_target_angles(const MountAngleTarget& angle_target_rad)
 {
     alexmos_parameters outgoing_buffer;
     outgoing_buffer.angle_speed.mode = AP_MOUNT_ALEXMOS_MODE_ANGLE;

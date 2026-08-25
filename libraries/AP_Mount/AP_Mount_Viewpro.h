@@ -16,9 +16,11 @@
 
 #pragma once
 
-#include "AP_Mount_Backend.h"
+#include "AP_Mount_config.h"
 
 #if HAL_MOUNT_VIEWPRO_ENABLED
+
+#include "AP_Mount_Backend_Serial.h"
 
 #include <AP_HAL/AP_HAL.h>
 #include <AP_Math/AP_Math.h>
@@ -27,18 +29,15 @@
 
 #define AP_MOUNT_VIEWPRO_PACKETLEN_MAX  63  // maximum number of bytes in a packet sent to or received from the gimbal
 
-class AP_Mount_Viewpro : public AP_Mount_Backend
+class AP_Mount_Viewpro : public AP_Mount_Backend_Serial
 {
 
 public:
     // Constructor
-    using AP_Mount_Backend::AP_Mount_Backend;
+    using AP_Mount_Backend_Serial::AP_Mount_Backend_Serial;
 
     /* Do not allow copies */
     CLASS_NO_COPY(AP_Mount_Viewpro);
-
-    // init - performs any required initialisation for this instance
-    void init() override;
 
     // update mount position - should be called periodically
     void update() override;
@@ -99,6 +98,11 @@ public:
     bool set_rangefinder_enable(bool enable) override;
 
 protected:
+
+    // Viewpro can send either rates or angles
+    uint8_t natively_supported_mount_target_types() const override {
+        return NATIVE_ANGLES_AND_RATES_ONLY;
+    };
 
     // get attitude as a quaternion.  returns true on success
     bool get_attitude_quaternion(Quaternion& att_quat) override;
@@ -161,7 +165,18 @@ private:
         START_RECORD = 0x14,
         STOP_RECORD = 0x15,
         AUTO_FOCUS = 0x19,
-        MANUAL_FOCUS = 0x1A
+        MANUAL_FOCUS = 0x1A,
+        IR_ZOOM_OUT = 0x1B,
+        IR_ZOOM_IN = 0x1C
+    };
+
+    // C1 rangefinder commands
+    enum class LRFCommand : uint8_t {
+        NO_ACTION = 0x00,
+        SINGLE_RANGING = 0x01,
+        CONTINUOUS_RANGING_START = 0x02,
+        LPCL_CONTINUOUS_RANGING_START = 0x03,
+        STOP_RANGING = 0x05
     };
 
     // C1 rangefinder commands
@@ -355,12 +370,10 @@ private:
     bool send_comm_config_cmd(CommConfigCmd cmd);
 
     // send target pitch and yaw rates to gimbal
-    // yaw_is_ef should be true if yaw_rads target is an earth frame rate, false if body_frame
-    bool send_target_rates(float pitch_rads, float yaw_rads, bool yaw_is_ef);
+    void send_target_rates(const MountRateTarget &rate_rads) override;
 
     // send target pitch and yaw angles to gimbal
-    // yaw_is_ef should be true if yaw_rad target is an earth frame angle, false if body_frame
-    bool send_target_angles(float pitch_rad, float yaw_rad, bool yaw_is_ef);
+    void send_target_angles(const MountAngleTarget &angle_rad) override;
 
     // send camera command, affected image sensor and value (e.g. zoom speed)
     bool send_camera_command(ImageSensor img_sensor, CameraCommand cmd, uint8_t value, LRFCommand lrf_cmd = LRFCommand::NO_ACTION);
@@ -372,17 +385,15 @@ private:
     bool send_tracking_command(TrackingCommand cmd, uint8_t value);
 
     // send camera command2 and corresponding parameter values
-    bool send_tracking_command2(TrackingCommand2 cmd, uint16_t param1, uint16_t param2);
+    bool send_tracking_command2(TrackingCommand2 cmd, int16_t param1, int16_t param2);
 
     // send vehicle attitude and position to gimbal
     bool send_m_ahrs();
 
     // internal variables
-    AP_HAL::UARTDriver *_uart;                      // uart connected to gimbal
-    bool _initialised;                              // true once the driver has been initialised
     uint8_t _msg_buff[AP_MOUNT_VIEWPRO_PACKETLEN_MAX];  // buffer holding latest bytes from gimbal
     uint8_t _msg_buff_len;                          // number of bytes held in msg buff
-    const uint8_t _msg_buff_data_start = 2;         // data starts at this byte of _msg_buff
+    static constexpr uint8_t _msg_buff_data_start = 2;         // data starts at this byte of _msg_buff
 
     // parser state and unpacked fields
     struct {
@@ -405,7 +416,7 @@ private:
     float _zoom_times;                              // zoom times received from gimbal
     uint32_t _firmware_version;                     // firmware version from gimbal
     bool _got_firmware_version;                     // true once we have received the firmware version
-    uint8_t _model_name[11] {};                     // model name received from gimbal
+    char _model_name[11] {};                        // model name received from gimbal, always null-terminated
     bool _got_model_name;                           // true once we have received model name
     float _rangefinder_dist_m;                      // latest rangefinder distance (in meters)
 };

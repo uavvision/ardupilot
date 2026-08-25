@@ -22,6 +22,7 @@
 #include <RC_Channel/RC_Channel.h>
 #include <AP_VideoTX/AP_VideoTX.h>
 #include <stdio.h>
+#include <GCS_MAVLink/GCS_Dummy.h>
 
 #if CONFIG_HAL_BOARD == HAL_BOARD_SITL
 #include <sys/types.h>
@@ -103,9 +104,9 @@ static bool check_result(const char *name, bool bytes, const uint16_t *values, u
         test_failures++;
         return false;
     }
-    const char *pname = rcprot->protocol_name();
+    const char *pname = rcprot->detected_protocol_name();
     if (strncmp(pname, name, strlen(pname)) != 0) {
-        printf("%s: wrong protocol detected %s\n", label, rcprot->protocol_name());
+        printf("%s: wrong protocol detected %s\n", label, pname);
         test_failures++;
         return false;
     }
@@ -485,7 +486,7 @@ void loop()
                                    0xC8, 0x14, 0x17, 0x20, 0x03, 0x0C, 0xA0, 0x00, 0xF6, 0xB7, 0x6E, 0x94, 0xFC,
                                    0x1F, 0x00, 0x00, 0x00, 0x00, 0x00, 0xFE, 0x0F, 0x6E };
     const uint16_t crsf_bad_output4[] = {1501, 1500, 989, 1497, 1873, 1136, 2011, 988, 988, 988, 988, 2011, 0, 0, 0, 0, 0, 0};
-    
+
 
     test_protocol("SRXL", 115200, srxl_bytes, sizeof(srxl_bytes), srxl_output, ARRAY_SIZE(srxl_output), 1);
     test_protocol("SUMD", 115200, sumd_bytes, sizeof(sumd_bytes), sumd_output, ARRAY_SIZE(sumd_output), 1);
@@ -533,5 +534,7 @@ void loop()
     }
     printf("Test count %u - %u failures\n", unsigned(test_count), unsigned(test_failures));
 }
+
+GCS_Dummy _gcs;
 
 AP_HAL_MAIN();

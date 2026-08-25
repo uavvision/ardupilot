@@ -35,10 +35,7 @@
 
 
 AP_RCProtocol_Backend::AP_RCProtocol_Backend(AP_RCProtocol &_frontend) :
-    frontend(_frontend),
-    rc_input_count(0),
-    last_rc_input_count(0),
-    _num_channels(0)
+    frontend(_frontend)
 {}
 
 bool AP_RCProtocol_Backend::new_input()
@@ -181,7 +178,7 @@ void AP_RCProtocol_Backend::log_data(AP_RCProtocol::rcprotocol_t prot, uint32_t 
 #if HAL_LOGGING_ENABLED && AP_RC_CHANNEL_ENABLED
 
 #if (CONFIG_HAL_BOARD == HAL_BOARD_SITL || CONFIG_HAL_BOARD == HAL_BOARD_LINUX)
-    if (&rc() == nullptr) { // allow running without RC_Channels if we are doing the examples
+    if (RC_Channels::get_singleton() == nullptr) { // allow running without RC_Channels if we are doing the examples
         return;
     }
 #endif

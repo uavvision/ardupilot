@@ -1,4 +1,4 @@
-#!/bin/bash
+#!/usr/bin/env bash
 
 # Example script for multi-vehicle simulation with AirSim
 # see https://ardupilot.org/dev/docs/sitl-with-airsim.html#multi-vehicle-simulation for details
@@ -63,7 +63,7 @@ for i in $(seq $NCOPTERS); do
 
     # create default parameter file for the follower
     cat <<EOF > copter$i/follow.parm
-SYSID_THISMAV $SYSID
+MAV_SYSID $SYSID
 FOLL_ENABLE 1
 FOLL_OFS_X -5
 FOLL_OFS_TYPE 1

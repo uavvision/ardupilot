@@ -64,6 +64,7 @@ void GCS_MAVLINK::handle_serial_control(const mavlink_message_t &msg)
         link->lock(exclusive);
         break;
     }
+#if AP_GPS_ENABLED
     case SERIAL_CONTROL_DEV_GPS1:
         stream = port = hal.serial(3);
         AP::gps().lock_port(0, exclusive);
@@ -72,12 +73,7 @@ void GCS_MAVLINK::handle_serial_control(const mavlink_message_t &msg)
         stream = port = hal.serial(4);
         AP::gps().lock_port(1, exclusive);
         break;
-    case SERIAL_CONTROL_DEV_SHELL:
-        stream = hal.util->get_shell_stream();
-        if (stream == nullptr) {
-            return;
-        }
-        break;
+#endif  // AP_GPS_ENABLED
     case SERIAL_CONTROL_SERIAL0 ... SERIAL_CONTROL_SERIAL9: {
         // direct access to a SERIALn port
         stream = port = AP::serialmanager().get_serial_by_id(packet.device - SERIAL_CONTROL_SERIAL0);
@@ -130,10 +126,10 @@ void GCS_MAVLINK::handle_serial_control(const mavlink_message_t &msg)
                     hal.scheduler->delay(5);
                 }
                 uint16_t n = stream->txspace();
-                if (n > packet.count) {
-                    n = packet.count;
+                if (n > count) {
+                    n = count;
                 }
-                stream->write(data, n);                
+                stream->write(data, n);
                 data += n;
                 count -= n;
             }

@@ -57,8 +57,8 @@ const AP_Param::GroupInfo AP_Terrain::var_info[] = {
 
     // @Param: OPTIONS
     // @DisplayName: Terrain options
-    // @Description: Options to change behaviour of terrain system
-    // @Bitmask: 0:Disable Download
+    // @Description: Options to change behavior of terrain system. The Accept Old Terrain Data option can be used to accept terrain data generated from before the terrain database bugs were fixed. The bugs in the data were all fixed from 24th February 2026. If you really want to risk using the old terrain data then you can set this option, otherwise remove the old terrain data by formatting your microSD card or renaming the /APM/TERRAIN folder. Then downloaded updated data from https://terrain.ardupilot.org, or let the automatic terrain download repopulate your terrain data.
+    // @Bitmask: 0:Disable Download,1:Disable Disk,2:Accept Old Terrain Data
     // @User: Advanced
     AP_GROUPINFO("OPTIONS",   2, AP_Terrain, options, 0),
 
@@ -77,7 +77,14 @@ const AP_Param::GroupInfo AP_Terrain::var_info[] = {
     // @Range: 0 50
     // @User: Advanced
     AP_GROUPINFO("OFS_MAX",  4, AP_Terrain, offset_max, 30),
-    
+
+    // @Param: CACHE_SZ
+    // @DisplayName: Terrain cache size
+    // @Description: The number of 32x28 cache blocks to keep in memory. Each block uses about 1800 bytes of memory
+    // @Range: 0 128
+    // @User: Advanced
+    AP_GROUPINFO("CACHE_SZ",  5, AP_Terrain, config_cache_size, TERRAIN_GRID_BLOCK_CACHE_SIZE),
+
     AP_GROUPEND
 };
 
@@ -147,19 +154,17 @@ bool AP_Terrain::height_amsl(const Location &loc, float &height, bool corrected)
     }
 
     // hXY are the heights of the 4 surrounding grid points
-    int16_t h00, h01, h10, h11;
-
-    h00 = grid.height[info.idx_x+0][info.idx_y+0];
-    h01 = grid.height[info.idx_x+0][info.idx_y+1];
-    h10 = grid.height[info.idx_x+1][info.idx_y+0];
-    h11 = grid.height[info.idx_x+1][info.idx_y+1];
+    const auto h00 = grid.height[info.idx_x+0][info.idx_y+0];
+    const auto h01 = grid.height[info.idx_x+0][info.idx_y+1];
+    const auto h10 = grid.height[info.idx_x+1][info.idx_y+0];
+    const auto h11 = grid.height[info.idx_x+1][info.idx_y+1];
 
     // do a simple dual linear interpolation. We could do something
     // fancier, but it probably isn't worth it as long as the
     // grid_spacing is kept small enough
-    float avg1 = (1.0f-info.frac_x) * h00  + info.frac_x * h10;
-    float avg2 = (1.0f-info.frac_x) * h01  + info.frac_x * h11;
-    float avg  = (1.0f-info.frac_y) * avg1 + info.frac_y * avg2;
+    const float avg1 = (1.0f-info.frac_x) * h00  + info.frac_x * h10;
+    const float avg2 = (1.0f-info.frac_x) * h01  + info.frac_x * h11;
+    const float avg  = (1.0f-info.frac_y) * avg1 + info.frac_y * avg2;
 
     height = avg;
 
@@ -359,7 +364,7 @@ void AP_Terrain::update(void)
     // just schedule any needed disk IO
     schedule_disk_io();
 
-    const AP_AHRS &ahrs = AP::ahrs();
+    AP_AHRS &ahrs = AP::ahrs();
 
     // try to ensure the home location is populated
     float height;
@@ -372,6 +377,9 @@ void AP_Terrain::update(void)
     if (pos_valid && terrain_valid) {
         last_current_loc_height = height;
         have_current_loc_height = true;
+
+        // send terrain altitude to AHRS for optical flow when rangefinder is out of range
+        ahrs.writeTerrainAMSL(height);
     }
 
     // check for pending mission data
@@ -436,6 +444,20 @@ bool AP_Terrain::pre_arm_checks(char *failure_msg, uint8_t failure_msg_len) cons
         hal.util->snprintf(failure_msg, failure_msg_len, "waiting for terrain data");
         return false;
     }
+    if (grid_spacing <= 0) {
+        hal.util->snprintf(failure_msg, failure_msg_len, "TERRAIN_SPACING can't be <= 0");
+        return false;
+    }
+
+    if (!option_set(Options::AcceptOldData) && found_old_data) {
+        /*
+          we have found old terrain data on the microSD card, warn the
+          user that they have out of date terrain data that may
+          contain errors.
+         */
+        hal.util->snprintf(failure_msg, failure_msg_len, "terrain data expired, possible errors");
+        return false;
+    }
 
     return true;
 }
@@ -488,13 +510,13 @@ bool AP_Terrain::allocate(void)
     if (cache != nullptr) {
         return true;
     }
-    cache = (struct grid_cache *)calloc(TERRAIN_GRID_BLOCK_CACHE_SIZE, sizeof(cache[0]));
+    cache = (struct grid_cache *)calloc(config_cache_size, sizeof(cache[0]));
     if (cache == nullptr) {
         GCS_SEND_TEXT(MAV_SEVERITY_CRITICAL, "Terrain: Allocation failed");
         memory_alloc_failed = true;
         return false;
     }
-    cache_size = TERRAIN_GRID_BLOCK_CACHE_SIZE;
+    cache_size = config_cache_size;
     return true;
 }
 
@@ -560,7 +582,7 @@ void AP_Terrain::update_reference_offset(void)
     if (!reference_loc.get_alt_cm(Location::AltFrame::ABSOLUTE, alt_cm)) {
         return;
     }
-    float adjustment = alt_cm*0.01 - height;
+    const float adjustment = alt_cm*0.01 - height;
     reference_offset = constrain_float(adjustment, -offset_max, offset_max);
     if (fabsf(adjustment) > offset_max.get()+0.5) {
         GCS_SEND_TEXT(MAV_SEVERITY_WARNING, "Terrain: clamping offset %.0f to %.0f",

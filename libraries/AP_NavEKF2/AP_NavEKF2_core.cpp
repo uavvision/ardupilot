@@ -1,8 +1,10 @@
+#include "AP_NavEKF2_core.h"
+
 #include <AP_HAL/AP_HAL.h>
+#include <AP_DAL/AP_DAL.h>
+#include <GCS_MAVLink/GCS.h>
 
 #include "AP_NavEKF2.h"
-#include "AP_NavEKF2_core.h"
-#include <GCS_MAVLink/GCS.h>
 
 extern const AP_HAL::HAL& hal;
 
@@ -28,10 +30,13 @@ extern const AP_HAL::HAL& hal;
  */
 #define ENABLE_EKF_TIMING 0
 
+NavEKF2_core::Matrix24 NavEKF2_core::KH;
+NavEKF2_core::Matrix24 NavEKF2_core::nextP;
+
 // constructor
 NavEKF2_core::NavEKF2_core(NavEKF2 *_frontend) :
-    frontend(_frontend),
-    dal(AP::dal())
+    dal(AP::dal()),
+    frontend(_frontend)
 {
 }
 
@@ -99,7 +104,7 @@ bool NavEKF2_core::setup_core(uint8_t _imu_index, uint8_t _core_index)
         }
 
         // try to instantiate
-        yawEstimator = new EKFGSF_yaw();
+        yawEstimator = NEW_NOTHROW EKFGSF_yaw();
         if (yawEstimator == nullptr) {
             GCS_SEND_TEXT(MAV_SEVERITY_CRITICAL, "EKF2 IMU%uGSF: allocation failed",(unsigned)imu_index);
             return false;
@@ -243,9 +248,11 @@ void NavEKF2_core::InitialiseVariables()
     delAngBiasLearned = false;
     memset(&filterStatus, 0, sizeof(filterStatus));
     activeHgtSource = 0;
+#if AP_RANGEFINDER_ENABLED
     memset(&rngMeasIndex, 0, sizeof(rngMeasIndex));
     memset(&storedRngMeasTime_ms, 0, sizeof(storedRngMeasTime_ms));
     memset(&storedRngMeas, 0, sizeof(storedRngMeas));
+#endif
     terrainHgtStable = true;
     ekfOriginHgtVar = 0.0f;
     ekfGpsRefHgt = 0.0;
@@ -539,6 +546,10 @@ void NavEKF2_core::UpdateFilter(bool predict)
 #endif
 
     fill_scratch_variables();
+#if CONFIG_HAL_BOARD == HAL_BOARD_SITL
+    fill_nanf(&KH[0][0], sizeof(KH)/sizeof(ftype)); // see fill_scratch_variables()
+    fill_nanf(&nextP[0][0], sizeof(nextP)/sizeof(ftype));
+#endif
 
     // TODO - in-flight restart method
 

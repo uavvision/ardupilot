@@ -1,4 +1,6 @@
-#!/usr/bin/env python
+#!/usr/bin/env python3
+
+# flake8: noqa
 
 import sys, fnmatch
 import importlib
@@ -67,9 +69,9 @@ def can_share(periph, noshare_list):
     return False
 
 
-# list of peripherals on H7 that are on DMAMUX2 and BDMA
+# list of peripherals that are on DMAMUX2 and BDMA
 have_DMAMUX = False
-DMAMUX2_peripherals = [ 'I2C4', 'SPI6', 'ADC3' ]
+DMAMUX2_peripherals = []
 
 def dmamux_channel(key):
     '''return DMAMUX channel for H7'''
@@ -297,6 +299,10 @@ def write_dma_header(f, peripheral_list, mcu_type, dma_exclude=[],
     '''write out a DMA resolver header file'''
     global dma_map, have_DMAMUX, has_bdshot
     timer_ch_periph = []
+
+    if mcu_type.startswith('STM32H7'):
+        global DMAMUX2_peripherals
+        DMAMUX2_peripherals = [ 'I2C4', 'SPI6', 'ADC3' ]
 
     has_bdshot = False
 

@@ -20,9 +20,8 @@
 #if HAL_NUM_CAN_IFACES
 
 #include <AP_HAL/CANIface.h>
-
+#include <AP_HAL/utility/RingBuffer.h>
 #include <string>
-#include <queue>
 #include <memory>
 #include <map>
 #include <unordered_set>
@@ -45,8 +44,8 @@ public:
     ~CANIface() { }
 
     // Initialise CAN Peripheral
-    bool init(const uint32_t bitrate, const uint32_t fdbitrate, const OperatingMode mode) override;
-    bool init(const uint32_t bitrate, const OperatingMode mode) override;
+    bool init(const uint32_t bitrate, const uint32_t fdbitrate) override;
+    bool init(const uint32_t bitrate) override;
 
     // number of enabled interfaces
     static uint8_t num_interfaces(void) {
@@ -127,8 +126,8 @@ private:
     AP_HAL::BinarySemaphore *sem_handle;
 
     pollfd _pollfd;
-    std::priority_queue<CanTxItem> _tx_queue;
-    std::queue<CanRxItem> _rx_queue;
+    ObjectArray<CanTxItem> _tx_queue{100};
+    ObjectArray<CanRxItem> _rx_queue{100};
 
     /*
       bus statistics

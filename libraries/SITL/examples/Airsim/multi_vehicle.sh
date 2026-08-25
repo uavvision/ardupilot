@@ -1,4 +1,4 @@
-#!/bin/bash
+#!/usr/bin/env bash
 
 # Example script for multi-vehicle simulation with AirSim and usage with ROS
 # see https://ardupilot.org/dev/docs/sitl-with-airsim.html#multi-vehicle-simulation for details
@@ -45,7 +45,7 @@ for i in $(seq $NCOPTERS); do
 
     # create seperate parameter file for each drone for SYSID
     cat <<EOF > copter$i/identity.parm
-SYSID_THISMAV $SYSID
+MAV_SYSID $SYSID
 EOF
 
     pushd copter$i

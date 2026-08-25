@@ -16,8 +16,8 @@ void NavEKF3_core::Log_Write_XKF1(uint64_t time_us) const
 {
     // Write first EKF packet
     Vector3f euler;
-    Vector2f posNE;
-    float posD;
+    Vector2p posNE;
+    postype_t posD;
     Vector3f velNED;
     Vector3f gyroBias;
     float posDownDeriv;
@@ -100,7 +100,10 @@ void NavEKF3_core::Log_Write_XKFS(uint64_t time_us) const
         baro_index     : selected_baro,
         gps_index      : selected_gps,
         airspeed_index : getActiveAirspeed(),
-        source_set     : frontend->sources.getPosVelYawSourceSet()
+        source_set     : frontend->sources.getPosVelYawSourceSet(),
+        gps_good_to_align : gpsGoodToAlign,
+        wait_for_gps_checks : waitingForGpsChecks,
+        mag_fusion: (uint8_t) magFusionSel
     };
     AP::logger().WriteBlock(&pkt, sizeof(pkt));
 }
@@ -196,13 +199,18 @@ void NavEKF3_core::Log_Write_XKF5(uint64_t time_us) const
         FIY : (int16_t)(1000*flowInnov[1]),  // optical flow LOS rate vector innovations from the main nav filter
         AFI : (int16_t)(1000 * auxFlowObsInnov.length()),  // optical flow LOS rate innovation from terrain offset estimator
         HAGL : float_to_int16(100*(terrainState - stateStruct.position.z)),    // height above ground level
-        offset : (int16_t)(100*terrainState),           // filter ground offset state error
+        terrOffset : (int16_t)(100*terrainState),       // filter ground offset state error
         RI : (int16_t)(100*innovRng),                   // range finder innovations
         meaRng : (uint16_t)(100*rangeDataDelayed.rng),  // measured range
+#if EK3_FEATURE_OPTFLOW_FUSION
         errHAGL : (uint16_t)(100*sqrtF(Popt)),          // note Popt is constrained to be non-negative in EstimateTerrainOffset()
+#else
+        errHAGL : 0,          // note Popt is constrained to be non-negative in EstimateTerrainOffset()
+#endif
         angErr : (float)outputTrackError.x,             // output predictor angle error
         velErr : (float)outputTrackError.y,             // output predictor velocity error
-        posErr : (float)outputTrackError.z              // output predictor position tracking error
+        posErr : (float)outputTrackError.z,             // output predictor position tracking error
+        baroOffset : (float)baroHgtOffset               // barometer height offset subtracted from raw baro measurement when fusing baro height
     };
     AP::logger().WriteBlock(&pkt5, sizeof(pkt5));
 }
@@ -238,7 +246,8 @@ void NavEKF3_core::Log_Write_Beacon(uint64_t time_us)
     }
 
     // Ensure that beacons are not skipped due to calling this function at a rate lower than the updates
-    if (rngBcn.fuseDataReportIndex >= rngBcn.N) {
+    if (rngBcn.fuseDataReportIndex >= rngBcn.N ||
+        rngBcn.fuseDataReportIndex > rngBcn.numFusionReports) {
         rngBcn.fuseDataReportIndex = 0;
     }
 
