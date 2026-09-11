@@ -708,8 +708,8 @@ class AutoTestCopter(vehicle_test_suite.TestSuite):
         self.wait_circling_point_with_radius(
             loc, radius,
             epsilon=1,
-            min_circle_time=360,
-            timeout=400,
+            min_circle_time=120,
+            timeout=240,
             track_angle=False,
         )
         self.wait_altitude(99, 101, relative=True, timeout=240)
@@ -766,6 +766,57 @@ class AutoTestCopter(vehicle_test_suite.TestSuite):
         self.wait_distance_to_home(10, 20)
         self.wait_disarmed(timeout=600)
         self.context_pop()
+
+    def CircleManualControlEntryLeft(self):
+        '''Circle orbits at the configured rate when entered holding roll stick left'''
+        # CIRCLE_OPTIONS defaults to 1 (manual control enabled); the pilot
+        # roll stick trims the orbit rate.  Holding the stick against the
+        # CIRCLE_RATE sign on entry used to pin the rate at zero so the
+        # vehicle never orbited at all.  The orbit must still reach the
+        # configured rate, and the pilot can then trim it down to a stop.
+        self.set_parameters({
+            "CIRCLE_RADIUS_M": 10,
+            "CIRCLE_RATE": 20,  # +ve, clockwise
+        })
+        expected_groundspeed = math.pi * 2 * 10 * (20 / 360.0)  # ~3.49m/s
+        self.takeoff(10, mode='LOITER')
+        self.hover()  # circle mode uses throttle input
+        self.set_rc(1, 1400)  # held left, against the CIRCLE_RATE sign
+        self.change_mode('CIRCLE')
+        self.wait_groundspeed(
+            expected_groundspeed - 0.5,
+            expected_groundspeed + 0.5,
+            minimum_duration=5,
+            timeout=30,
+        )
+        # the pilot can still trim the orbit rate down to a stop:
+        self.set_rc(1, 1100)
+        self.wait_groundspeed(0, 0.5, minimum_duration=2, timeout=60)
+        self.set_rc(1, 1500)
+        self.do_RTL()
+
+    def CircleManualControlEntryRight(self):
+        '''Circle orbits at the configured rate when entered holding roll stick right'''
+        # Holding the roll stick with the CIRCLE_RATE sign on entry used to
+        # leave the rate crawling up from zero instead of starting at the
+        # configured rate.  The orbit must reach the configured rate.
+        self.set_parameters({
+            "CIRCLE_RADIUS_M": 10,
+            "CIRCLE_RATE": 20,  # +ve, clockwise
+        })
+        expected_groundspeed = math.pi * 2 * 10 * (20 / 360.0)  # ~3.49m/s
+        self.takeoff(10, mode='LOITER')
+        self.hover()  # circle mode uses throttle input
+        self.set_rc(1, 1600)  # held right, with the CIRCLE_RATE sign
+        self.change_mode('CIRCLE')
+        self.wait_groundspeed(
+            expected_groundspeed - 0.5,
+            expected_groundspeed + 0.5,
+            minimum_duration=5,
+            timeout=30,
+        )
+        self.set_rc(1, 1500)
+        self.do_RTL()
 
     # enter RTL mode and wait for the vehicle to disarm
     def do_RTL(self, distance_min=None, check_alt=True, distance_max=10, timeout=250, quiet=False):
@@ -2832,50 +2883,57 @@ class AutoTestCopter(vehicle_test_suite.TestSuite):
         # re-arming is problematic because the GPS is glitching!
         self.reboot_sitl()
 
-    #   fly_simple - assumes the simple bearing is initialised to be
-    #   directly north flies a box with 100m west, 15 seconds north,
-    #   50 seconds east, 15 seconds south
-    def SimpleMode(self, side=50):
+    #   SimpleMode - test simple mode flies North regardless of vehicle heading
+    def SimpleMode(self):
         '''Fly in SIMPLE mode'''
+
+        # reboot to ensure previous test doesn't affect the initial heading
+        self.reboot_sitl()
+
+        # set SIMPLE mode for FlightMode2 (AltHold)
+        self.set_parameters({
+            "FLTMODE_CH": 5,
+            "FLTMODE1": 5, # Loiter
+            "FLTMODE2": 2, # AltHold
+            "SIMPLE": 2,   # FLTMODE2 uses simple mode
+        })
+
+        # Takeoff in loiter
         self.takeoff(10, mode="LOITER")
 
-        # set SIMPLE mode for all flight modes
-        self.set_parameter("SIMPLE", 63)
+        # Fail immediately if heading is not the expected 270
+        self.wait_heading(270, 5, timeout=60)
 
-        # switch to stabilize mode
-        self.change_mode('STABILIZE')
-        self.set_rc(3, 1545)
+        # Try a range of headings
+        for yaw_angle in [0, 90, 180, 270]:
+            self.progress("Testing SIMPLE mode with copter yaw=%u degrees" % yaw_angle)
 
-        # fly south 50m
-        self.progress("# Flying south %u meters" % side)
-        self.set_rc(1, 1300)
-        self.wait_distance(side, 5, 60)
-        self.set_rc(1, 1500)
+            # yaw to test angle
+            self.set_rc(4, 1560)
+            self.wait_heading(yaw_angle, timeout=60)
+            self.set_rc(4, 1500)
 
-        # fly west 8 seconds
-        self.progress("# Flying west for 8 seconds")
-        self.set_rc(2, 1300)
-        tstart = self.get_sim_time()
-        while self.get_sim_time_cached() < (tstart + 8):
-            self.assert_receive_message('VFR_HUD')
-        self.set_rc(2, 1500)
+            # switch to alt hold mode
+            self.set_rc(5, 1298)
 
-        # fly north 25 meters
-        self.progress("# Flying north %u meters" % (side/2.0))
-        self.set_rc(1, 1700)
-        self.wait_distance(side/2, 5, 60)
-        self.set_rc(1, 1500)
+            # RC input to roll right towards North
+            start = self.get_location()
+            self.set_rc(1, 1700)
+            self.wait_distance(50)
+            self.set_rc(1, 1500)
 
-        # fly east 8 seconds
-        self.progress("# Flying east for 8 seconds")
-        self.set_rc(2, 1700)
-        tstart = self.get_sim_time()
-        while self.get_sim_time_cached() < (tstart + 8):
-            self.assert_receive_message('VFR_HUD')
-        self.set_rc(2, 1500)
+            # verify ground course is approximately north
+            end = self.get_location()
+            bearing = self.get_bearing(start, end)
+            if self.heading_delta(bearing, 0) > 10:
+                raise NotAchievedException(
+                    "SIMPLE mode yaw=%u: ground course %f, want ~0 (north)" %
+                    (yaw_angle, bearing)
+                )
 
-        # hover in place
-        self.hover()
+            # Loiter to a stop before next iteration
+            self.set_rc(5, 1165)
+            self.wait_groundspeed(0, 0.1)
 
         self.do_RTL(timeout=500)
 
@@ -12266,6 +12324,25 @@ class AutoTestCopter(vehicle_test_suite.TestSuite):
         self.change_mode("LAND")
         self.wait_landed_and_disarmed()
 
+    def MissionRTLAltFinalContinue(self):
+        '''ensure AUTO mission can continue past a NAV_RETURN_TO_LAUNCH item
+        even if the vehicle holds altitude at RTL_ALT_FINAL_M'''
+        target_alt = 5
+        self.set_parameters({
+            "AUTO_OPTIONS": 3,
+            "RTL_ALT_FINAL_M": target_alt,
+        })
+        self.start_flying_simple_relhome_mission([
+            (mavutil.mavlink.MAV_CMD_NAV_TAKEOFF, 0, 0, 20),
+            (mavutil.mavlink.MAV_CMD_NAV_RETURN_TO_LAUNCH, 0, 0, 0),
+            (mavutil.mavlink.MAV_CMD_NAV_TAKEOFF, 0, 0, 20),
+            (mavutil.mavlink.MAV_CMD_NAV_LAND, 0, 0, 0),
+        ])
+
+        # ensure the vehicle reaches the LAND command instead of getting stuck at RTL
+        self.wait_current_waypoint(4, timeout=60)
+        self.wait_disarmed()
+
     def SMART_RTL(self):
         '''Check SMART_RTL'''
         self.progress("arm the vehicle and takeoff in Guided")
@@ -14085,7 +14162,7 @@ class AutoTestCopter(vehicle_test_suite.TestSuite):
 
     def BrakeZ(self):
         '''check jerk limit correct in Brake mode'''
-        self.set_parameter('PSC_JERK_D', 3)
+        self.set_parameter('PSC_D_JERK', 3)
         self.takeoff(50, mode='GUIDED')
         vx, vy, vz_up = (0, 0, -1)
         self.test_guided_local_velocity_target(vx=vx, vy=vy, vz_up=vz_up, timeout=10)
@@ -16394,6 +16471,7 @@ return update, 1000
             self.GSF_reset,
             self.AP_Avoidance,
             self.RTL_ALT_FINAL_M,
+            self.MissionRTLAltFinalContinue,
             self.SMART_RTL,
             self.SMART_RTL_EnterLeave,
             self.SMART_RTL_Repeat,
@@ -16444,6 +16522,8 @@ return update, 1000
             self.ScriptCopterPosOffsets,
             self.MountSolo,
             self.MountSiyiZT30,
+            self.CircleManualControlEntryLeft,
+            self.CircleManualControlEntryRight,
             self.MountTopotek,
             self.MountViewPro,
             self.MountAVTCM62,

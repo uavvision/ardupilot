@@ -15,6 +15,7 @@ TARGET_HW_PX4_FMU_V6C                  56
 TARGET_HW_ARK_FMU_V6X                  57
 TARGET_HW_ARK_PI6X                     58
 TARGET_HW_ARK_FPV                      59
+TARGET_HW_ARK_FMU_V6S                  61
 TARGET_HW_MINDPX_V2                    88
 TARGET_HW_PX4_FLOW_V1                   6
 TARGET_HW_PX4_DISCOVERY_V1             99
@@ -332,6 +333,7 @@ AP_HW_CORVON_V5                      1211
 
 AP_HW_CSKY_PMU                       1212
 AP_HW_PilotGaeaSH7V1                 1213
+AP_HW_ORBITH743v2                    1219
 
 AP_HW_MUPilot                        1222
 AP_HW_HWH7                           1223
