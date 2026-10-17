@@ -1,0 +1,23 @@
+# Visual course-hold SITL parameters (canonical set for every run)
+#
+# Applied at SITL launch by Tools/scripts/visualcourse_sitl.sh (via -P NAME=VALUE),
+# or loadable with `param load` / `sim_vehicle.py --add-param-file`.
+# Lines are NAME + whitespace + VALUE; # starts a comment.
+
+# --- environment ---
+SIM_GPS_DISABLE  0
+SIM_WIND_SPD     8
+SIM_WIND_DIR     90
+# flat ground: CRUISE locks a random heading and hills near CMAC rise above 60 m AGL
+SIM_TERRAIN      0
+
+# --- dataflash logging while disarmed (so the VC message is logged) ---
+LOG_DISARMED     1
+
+# --- visual course feature + force visual steering even with GPS ---
+VC_ENABLE        1
+VC_FORCE         1
+
+# --- untuned PD gains (autotune runs start from these) ---
+VC_GAIN_P        0.8
+VC_GAIN_D        0.0

@@ -77,6 +77,7 @@
 #include <AP_Rally/AP_Rally.h>
 
 #include <AP_OpticalFlow/AP_OpticalFlow.h>     // Optical Flow library
+#include <AP_VisualCourse/AP_VisualCourse.h>   // Visual course-hold library
 #include <AP_Parachute/AP_Parachute.h>
 #include <AP_ADSB/AP_ADSB.h>
 #include <AP_ICEngine/AP_ICEngine.h>
@@ -254,6 +255,11 @@ private:
 #if AP_OPTICALFLOW_ENABLED
     // Optical flow sensor
     AP_OpticalFlow optflow;
+#endif
+
+#if AP_VISUALCOURSE_ENABLED
+    // Visual course-hold (non-GPS forward optical flow)
+    AP_VisualCourse visual_course;
 #endif
 
 #if HAL_RALLY_ENABLED

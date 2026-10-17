@@ -96,6 +96,14 @@ bool AP_Arming_Plane::pre_arm_checks(bool display_failure)
         ret = false;
     }
 
+#if AP_VISUALCOURSE_ENABLED && AP_OPTICALFLOW_ENABLED
+    if (plane.visual_course.enabled() && plane.optflow.enabled() &&
+        (plane.optflow.get_type() == AP_OpticalFlow::Type::MAVLINK)) {
+        check_failed(display_failure, "VC_ENABLE conflicts with FLOW_TYPE=5 (MAVLink)");
+        ret = false;
+    }
+#endif
+
     if (plane.channel_throttle->get_reverse() && 
         Plane::ThrFailsafe(plane.g.throttle_fs_enabled.get()) != Plane::ThrFailsafe::Disabled &&
         plane.g.throttle_fs_value < 

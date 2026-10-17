@@ -955,6 +955,12 @@ const AP_Param::Info Plane::var_info[] = {
     GOBJECT(optflow,   "FLOW", AP_OpticalFlow),
 #endif
 
+#if AP_VISUALCOURSE_ENABLED
+    // @Group: VC_
+    // @Path: ../libraries/AP_VisualCourse/AP_VisualCourse.cpp
+    GOBJECT(visual_course, "VC_", AP_VisualCourse),
+#endif
+
     // @Group: MIS_
     // @Path: ../libraries/AP_Mission/AP_Mission.cpp
     GOBJECT(mission, "MIS_",       AP_Mission),

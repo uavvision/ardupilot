@@ -131,6 +131,7 @@ public:
         k_param_override_channel,
         k_param_stall_prevention,
         k_param_optflow,
+        k_param_visual_course,
         k_param_cli_enabled_old, // unused - CLI removed
         k_param_trim_rc_at_start, // unused
         k_param_hil_mode_unused,  // unused

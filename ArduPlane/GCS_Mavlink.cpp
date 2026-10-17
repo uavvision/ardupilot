@@ -1405,6 +1405,20 @@ void GCS_MAVLINK_Plane::handle_message(const mavlink_message_t &msg)
         break;
     }
 
+    case MAVLINK_MSG_ID_OPTICAL_FLOW:
+#if AP_OPTICALFLOW_ENABLED
+        handle_optical_flow(msg);
+#endif
+#if AP_VISUALCOURSE_ENABLED
+        {
+            AP_VisualCourse *visualcourse = AP::visualcourse();
+            if (visualcourse != nullptr) {
+                visualcourse->handle_msg(msg);
+            }
+        }
+#endif
+        break;
+
     default:
         GCS_MAVLINK::handle_message(msg);
         break;

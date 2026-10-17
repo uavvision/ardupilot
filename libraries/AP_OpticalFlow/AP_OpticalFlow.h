@@ -62,6 +62,9 @@ public:
     // enabled - returns true if optical flow is enabled
     bool enabled() const { return _type != Type::NONE; }
 
+    // configured sensor type
+    Type get_type() const { return (Type)_type.get(); }
+
     // healthy - return true if the sensor is healthy
     bool healthy() const { return backend != nullptr && _flags.healthy; }
 

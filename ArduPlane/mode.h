@@ -549,8 +549,10 @@ protected:
     bool _enter() override;
 
     bool locked_heading;
+    bool using_visual_course;
     int32_t locked_heading_cd;
     uint32_t lock_timer_ms;
+    uint32_t visual_dropout_start_ms;  // 0 = no dropout; else start of visual dropout
 };
 
 #if HAL_ADSB_ENABLED
