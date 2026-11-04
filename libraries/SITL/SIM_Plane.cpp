@@ -29,6 +29,12 @@ Plane::Plane(const char *frame_str) :
 {
     mass = 2.0f;
 
+    // типові значення: поправка гвинта вимкнена, момент не ділиться на інерцію
+    prop_v_pitch = 0.0f;
+    inertia_roll = 1.0f;
+    inertia_pitch = 1.0f;
+    inertia_yaw = 1.0f;
+
     /*
        scaling from motor power to Newtons. Allows the plane to hold
        vertically against gravity when the motor is at hover_throttle
@@ -46,6 +52,37 @@ Plane::Plane(const char *frame_str) :
         // a 22kg "jet", level top speed is 102m/s
         mass = 22;
         thrust_scale = (mass * GRAVITY_MSS) / hover_throttle;
+    }
+    if (strstr(frame_str, "-canard30")) {
+        /*
+          30-кг канард зі штовхаючим гвинтом 23x13 (реальний борт).
+          Параметри зняті з логу real/00000006.BIN і з двох його усталених
+          точок: крейсер 27.4 м/с при 59 % газу і 30.6 м/с (110 км/г) на 100 %.
+          Дві невідомі (V_pitch гвинта і CD0 планера) розв'язані саме на цих
+          двох точках, тому модель відтворює ОБИДВІ, а не одну:
+              T0*(1 - 30.6/Vp) = q(30.6)*S*(CD0 + CDi)
+              0.59*T0*(1 - 27.4/Vp) = q(27.4)*S*(CD0 + CDi)
+          -> Vp = 35.6 м/с, CD0 = 0.027.
+          Аеродинамічні похідні (c_lift_*, c_l_deltaa, c_m_*, ...) не чіпаємо:
+          вони задають реакцію на рулі, а не швидкості, і вже матчаться гейнами
+          ArduPlane (tests/sitl/sitl.parm, блок 4).
+        */
+        mass = 30;
+        // статична тяга 17-20 кгс на 100 %: номінал 18.4 кгс = 180 Н
+        thrust_scale = 180;
+        // крок 13" = 0.3302 м; повний газ ~6470 об/хв -> крокова швидкість 35.6 м/с
+        prop_v_pitch = 35.6f;
+        // планер: S = 1.05 м², розмах 2.4 м (подовження 5.5), САХ 0.44 м
+        coefficient.s = 1.05f;
+        coefficient.b = 2.4f;
+        coefficient.c = 0.44f;
+        // паразитний опір планера з тих самих двох точок (на крейсері L/D ~11)
+        coefficient.c_drag_p = 0.027f;
+        // інерції: Ixx підібрано так, щоб tau_roll = 146 мс (замір борта):
+        //   tau = 2*I*V / (q*S*b^2*|c_l_p|) = 0.0197*I  ->  I = 7.4
+        inertia_roll = 7.4f;
+        inertia_pitch = 6.0f;
+        inertia_yaw = 13.4f;
     }
     if (strstr(frame_str, "-revthrust")) {
         reverse_thrust = true;
@@ -340,7 +377,12 @@ void Plane::calculate_forces(const struct sitl_input &input, Vector3f &rot_accel
     }
     
     Vector3f force = getForce(aileron, elevator, rudder);
+    // getTorque() віддає момент у Н·м, а update_dynamics() чекає кутове
+    // прискорення — тому ділимо на інерцію (типово 1, тобто як раніше)
     rot_accel = getTorque(aileron, elevator, rudder, thrust, force);
+    rot_accel.x /= inertia_roll;
+    rot_accel.y /= inertia_pitch;
+    rot_accel.z /= inertia_yaw;
 
     if (have_launcher) {
         /*
@@ -367,6 +409,11 @@ void Plane::calculate_forces(const struct sitl_input &input, Vector3f &rot_accel
     
     // scale thrust to newtons
     thrust *= thrust_scale;
+
+    if (prop_v_pitch > 0) {
+        // гвинт втрачає тягу зі швидкістю: T = T0 * (1 - V/V_pitch)
+        thrust *= constrain_float(1.0f - airspeed / prop_v_pitch, 0.0f, 1.0f);
+    }
 
     accel_body = Vector3f(thrust, 0, 0) + force;
     accel_body /= mass;

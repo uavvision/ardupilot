@@ -290,6 +290,17 @@ class VehicleInfo(object):
                 "waf_target": "bin/arduplane",
                 "default_params_filename": ["models/plane.parm", "default_params/plane-jet.parm"],
             },
+            # 30-кг канард зі штовхаючим гвинтом 23x13. Маса, тяга гвинта,
+            # планер і інерції задаються в SIM_Plane.cpp (блок "-canard30"),
+            # тому дефолти тут — лише базові для ArduPlane; KAM_* і RLL/PTCH
+            # приходять з tests/sitl/sitl.parm.
+            # Увага: маркерів "-3d"/"-jet" в імені бути не повинно — "-3d" дає
+            # thrust_scale*1.5 і aerobatic (рулі x4, пропвош), а "-jet"
+            # перезапише масу на 22 кг і тягу на 22*g/0.7.
+            "plane-canard30": {
+                "waf_target": "bin/arduplane",
+                "default_params_filename": "models/plane.parm",
+            },
             "plane-ice": {
                 "waf_target": "bin/arduplane",
                 "default_params_filename": ["models/plane.parm", "default_params/plane-ice.parm"],
