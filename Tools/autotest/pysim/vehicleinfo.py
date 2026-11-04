@@ -301,6 +301,17 @@ class VehicleInfo(object):
                 "waf_target": "bin/arduplane",
                 "default_params_filename": "models/plane.parm",
             },
+            # Той самий борт, але старт із катапульти: маркер "-catapult" вмикає
+            # у SIM_Plane рейку (35 м/с² × 0.7 с -> 24.5 м/с на виході), а
+            # блок "-canard30" перекриває штатні 15 м/с² × 2 с, бо ті дають
+            # 30 м/с — більше, ніж апарат здатен тримати в горизонті.
+            # Тригер — вихід каналу 7 (SERVO7) > 1700; у sitl.parm стоїть
+            # SERVO7_FUNCTION 1 (RCPassThru), і sitl_start.py «стріляє»
+            # через RC_CHANNELS_OVERRIDE.
+            "plane-canard30-catapult": {
+                "waf_target": "bin/arduplane",
+                "default_params_filename": "models/plane.parm",
+            },
             "plane-ice": {
                 "waf_target": "bin/arduplane",
                 "default_params_filename": ["models/plane.parm", "default_params/plane-ice.parm"],

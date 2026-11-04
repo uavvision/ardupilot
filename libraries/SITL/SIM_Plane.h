@@ -126,8 +126,17 @@ protected:
     bool tailsitter;
     bool aerobatic;
     bool copter_tailsitter;
+    /*
+      Катапульта/банджі. Механіка (як в апстрімі): поки `input.servos[6]` > 1700
+      (вихід каналу 7), до тіла прикладається `mass * launch_accel` уперед і
+      `mass * launch_accel_z` по осі z (у FRD z — ВНИЗ, тому додатне значення
+      штовхає в землю). `launch_accel_z` винесено окремо, щоб 30-кілограмовий
+      апарат міг мати чисто горизонтальну рейку, не змінюючи поведінку старих
+      фреймів (у них там історично `launch_accel/3`).
+    */
     bool have_launcher;
     float launch_accel;
+    float launch_accel_z;
     float launch_time;
     uint64_t launch_start_ms;
 

@@ -34,6 +34,7 @@ Plane::Plane(const char *frame_str) :
     inertia_roll = 1.0f;
     inertia_pitch = 1.0f;
     inertia_yaw = 1.0f;
+    launch_accel_z = 0.0f;
 
     /*
        scaling from motor power to Newtons. Allows the plane to hold
@@ -101,16 +102,45 @@ Plane::Plane(const char *frame_str) :
         have_launcher = true;
         launch_accel = 15;
         launch_time = 2;
+        // вертикальна складова як в апстрімі (у FRD додатна = вниз)
+        launch_accel_z = launch_accel / 3.0f;
     }
     if (strstr(frame_str, "-bungee")) {
         have_launcher = true;
         launch_accel = 7;
         launch_time = 4;
+        launch_accel_z = launch_accel / 3.0f;
     }
     if (strstr(frame_str, "-throw")) {
         have_launcher = true;
         launch_accel = 25;
         launch_time = 0.4;
+        launch_accel_z = launch_accel / 3.0f;
+    }
+
+    if (have_launcher && strstr(frame_str, "-canard30")) {
+        /*
+          Катапульта під 30 кг. Стандартні 15 м/с² протягом 2 с дають 30 м/с —
+          це більше, ніж апарат здатен тримати в горизонті (110 км/г на повному
+          газі), тому рейка коротша й жорсткіша.
+
+          Число перевірене виміром: звичайний розбіг на цій моделі НЕМОЖЛИВИЙ.
+          Земля в SITL додає опір `accel_body.x -= vel_body.x * 0.3`, тобто на
+          12 м/с це вже -3.6 м/с²; тяга при цьому 180*(1-12/35.6) = 119 Н, що
+          дає 3.97 м/с². Рівновага: 180*(1-V/35.6)/30 = 0.3*V -> V = 12.8 м/с.
+          Прогін 23-11-29 це й показав: швидкість застрягла на 12.1-12.2 м/с,
+          висота 0.1-0.8 м, злету немає. Тому старт — тільки з рейки.
+
+          Рейка: 38 м/с² x 0.8 с = 30.4 м/с ідеально, мінус ~3.5 м/с на тертя
+          об землю -> ~27 м/с на виході (вище зриву ≈18.4 м/с і вище крейсера
+          27.4, тобто одразу в робочому діапазоні). Довжина рейки ~12 м.
+
+          Вертикальну складову прибрано: у апстрімі вона штовхає ВНИЗ (FRD), і
+          на 30 кг це -8 м/с за 0.8 с — тобто апарат замість зльоту йшов у землю.
+        */
+        launch_accel = 38;
+        launch_time = 0.8f;
+        launch_accel_z = 0.0f;
     }
     if (strstr(frame_str, "-tailsitter")) {
         tailsitter = true;
@@ -395,7 +425,7 @@ void Plane::calculate_forces(const struct sitl_input &input, Vector3f &rot_accel
             }
             if (now - launch_start_ms < launch_time*1000) {
                 force.x += mass * launch_accel;
-                force.z += mass * launch_accel/3;
+                force.z += mass * launch_accel_z;
             }
         } else {
             // allow reset of catapult
