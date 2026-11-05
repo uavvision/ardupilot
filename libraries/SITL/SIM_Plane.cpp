@@ -33,6 +33,8 @@ Plane::Plane(const char *frame_str) :
     prop_v_pitch = 0.0f;
     throttle_exponent = 1.0f;
     prop_windmill_drag = 0.0f;
+    prop_windmill_throttle = 0.25f;
+    prop_windmill_exponent = 1.0f;
     inertia_roll = 1.0f;
     inertia_pitch = 1.0f;
     inertia_yaw = 1.0f;
@@ -76,11 +78,15 @@ Plane::Plane(const char *frame_str) :
               * 91 % / 27.8 м/с — набір 3.5–4.4 м/с;
               * 98 % / 33.6 м/с — набір 2.2–2.5 м/с;
               * 72 % / 27.9 м/с — усталений рівень.
-          Фіт (T0=180 Н, CD0=0.027, e=0.9, маса 30 кг) дає Vp=45 м/с і
-          показник throttle 2.0 (тяга ~ оберти², оберти ~ throttle):
-              T(V, thr) = 180 * thr^2 * clamp(1 - V/45, 0, 1)
-          Перевірка: 59 %/27.4 -> 24.5 Н проти опору 24.6 Н (рівень);
-          91 %/27.8 -> 57 Н -> клімб 3.0 м/с; 100 %/33.5 -> 46 Н -> 2.2 м/с.
+          Фіт (T0=180 Н, CD0=0.027, e=0.9, маса 30 кг) дає Vp=45 м/с.
+          Нижче 60 % газу гвинт гальмує (вітрянка), вище — тяга лінійно
+          від 0 до повної:
+              T(V, thr) = 180 * max(0,(thr-0.6)/0.4) * clamp(1-V/45, 0, 1)
+          Перевірка: 70 %/27.9 -> 17 Н (крейсер потребує ~75 %);
+          91 %/27.8 -> 53 Н -> клімб 2.7 м/с; 100 %/33.5 -> 46 Н -> 2.2 м/с.
+          На спуску 95–105 км/г при 55 % газу тяга 0, а вітрянка ~8 Н
+          (sqrt-спад) — саме та від'ємна тяга, яку показує real-лог
+          (T_req ≈ −8 Н, зниження ~3 м/с).
           Аеродинамічні похідні (c_lift_*, c_l_deltaa, c_m_*, ...) не чіпаємо:
           вони задають реакцію на рулі, а не швидкості, і вже матчаться гейнами
           ArduPlane (tests/sitl/sitl.parm, блок 4).
@@ -106,8 +112,16 @@ Plane::Plane(const char *frame_str) :
         // ефективна крокова швидкість за non-ACRO набором; не 35.6, бо реальний
         // гвинт у польоті розкручується вище 6470 об/хв і не втрачає тягу так рано
         prop_v_pitch = 45.0f;
-        // тяга ~ throttle² (ESC: оберти ~ throttle, тяга ~ оберти²)
-        throttle_exponent = 2.0f;
+        // Нижче 60 % ESC тримає гвинт у режимі гальмування: у real-логу на
+        // спуску 95–105 км/г стоїть 30–60 % газу, але T_req ≈ −8 Н, тобто
+        // гвинт все ще гальмує. Тому тяга вмикається лише після 60 %, а
+        // нижче працює вітрянка (див. prop_windmill_throttle).
+        prop_windmill_throttle = 0.60f;
+        // sqrt: при 55 % газу опір ще ~8 Н (реальний T_req ≈ −8 Н на
+        // 95–105 км/г і зниженні ~3 м/с), а при 0 % — ті самі ~28 Н, що
+        // дають заміряне L/D 5.4
+        prop_windmill_exponent = 0.5f;
+        throttle_exponent = 1.0f;
         // планер: S = 1.05 м², розмах 2.4 м (подовження 5.5), САХ 0.44 м
         coefficient.s = 1.05f;
         coefficient.b = 2.4f;
@@ -452,7 +466,20 @@ void Plane::calculate_forces(const struct sitl_input &input, Vector3f &rot_accel
     */
     const bool on_launcher = have_launcher && !launcher_fired && launcher_hold_height > 0.0f;
 
-    float thrust     = on_launcher ? 0.0f : throttle;
+    /*
+      Для -canard30 гвинт до prop_windmill_throttle не тягне, а гальмує:
+      тяга = 0, а опір вітрянки росте до 0 при досягненні порогу. Вище порогу
+      ефективний газ лінійно росте від 0 до 1, тому при 70 % тяга ~25 % від
+      повної — саме стільки потрібно для крейсеру 27–28 м/с.
+    */
+    float thrust = on_launcher ? 0.0f : throttle;
+    if (!on_launcher && prop_windmill_throttle > 0.25f) {
+        if (throttle <= prop_windmill_throttle) {
+            thrust = 0.0f;
+        } else {
+            thrust = (throttle - prop_windmill_throttle) / (1.0f - prop_windmill_throttle);
+        }
+    }
 
     battery_voltage = sitl->batt_voltage - 0.7*throttle;
     battery_current = (battery_voltage/sitl->batt_voltage)*50.0f*sq(throttle);
@@ -508,9 +535,9 @@ void Plane::calculate_forces(const struct sitl_input &input, Vector3f &rot_accel
         }
     }
     
-    // simulate engine RPM
+    // simulate engine RPM (actual throttle, not the deadbanded thrust)
     motor_mask |= (1U<<2);
-    rpm[2] = thrust * 7000;
+    rpm[2] = throttle * 7000;
     
     // scale thrust to newtons
     thrust *= thrust_scale;
@@ -525,13 +552,16 @@ void Plane::calculate_forces(const struct sitl_input &input, Vector3f &rot_accel
         thrust *= constrain_float(1.0f - airspeed / prop_v_pitch, 0.0f, 1.0f);
     }
 
-    if (prop_windmill_drag > 0 && throttle < 0.25f) {
+    if (prop_windmill_drag > 0 && throttle < prop_windmill_throttle) {
         /*
-          Вітрянка: на холостих гвинт гальмує, а не тягне. Лінійно від
-          25 % газу до нуля — саме цей доданок прибирає «планерний» розгін
-          у пікіруванні (див. проп_windmill_drag у заголовку).
+          Вітрянка: на малому газі гвинт гальмує, а не тягне. Лінійно від
+          prop_windmill_throttle до нуля — саме цей доданок прибирає
+          «планерний» розгін у пікіруванні (див. prop_windmill_drag).
         */
-        const float windmill = (0.25f - throttle) / 0.25f;
+        float windmill = (prop_windmill_throttle - throttle) / prop_windmill_throttle;
+        if (fabsf(prop_windmill_exponent - 1.0f) > 1.0e-6f) {
+            windmill = powf(windmill, prop_windmill_exponent);
+        }
         force.x -= prop_windmill_drag * airspeed * windmill;
     }
 
