@@ -77,6 +77,15 @@ Aircraft::Aircraft(const char *frame_str) :
     }
 }
 
+/*
+  Прапорець «апарат уже злетів». Потрібен, щоб після зльоту SITL більше не
+  застосовував земляний код: інакше при зниженні нижче рельєфу `position.z`
+  затискається до землі, друкується "SIM Hit ground", апарат «прилипає» або
+  розбивається. Для наведення це зайве — нам треба дати йому пролетіти над
+  землею/крізь неї й продовжити оцінку, а не зупиняти прогін.
+*/
+static bool has_taken_off = false;
+
 void Aircraft::set_start_location(const Location &start_loc, const float start_yaw)
 {
     home = start_loc;
@@ -84,6 +93,9 @@ void Aircraft::set_start_location(const Location &start_loc, const float start_y
     position.xy().zero();
     home_yaw = start_yaw;
     home_is_set = true;
+
+    // скидаємо прапорець при старті/перезапуску симуляції
+    has_taken_off = false;
 
     ::printf("Home: %f %f alt=%fm hdg=%f\n",
              home.lat*1e-7,
@@ -140,6 +152,18 @@ float Aircraft::hagl() const
 */
 bool Aircraft::on_ground() const
 {
+    // Якщо апарат уже злетів — землі для нього більше не існує
+    if (has_taken_off) {
+        return false;
+    }
+
+    // Піднялися вище 0.2 м — фіксуємо зліт. Після цього земляний код
+    // (тертя, затискання position.z, "SIM Hit ground") не застосовується.
+    if (hagl() > 0.2f) {
+        has_taken_off = true;
+        return false;
+    }
+
     return hagl() <= 0.001f;  // prevent bouncing around ground
 }
 
