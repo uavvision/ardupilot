@@ -506,11 +506,14 @@ void Plane::calculate_forces(const struct sitl_input &input, Vector3f &rot_accel
   update the plane simulation by one time step
  */
 /*
-  Тримає апарат на рейці ДО пострілу: задана висота над землею, заданий тангаж,
-  нульова швидкість. Викликається після update_dynamics(), тому перекриває і
-  гравітацію, і земляний код; поки це діє, `on_ground()` дає false (hagl > 0),
-  тобто кутова динаміка вільна і тертя 0.3*V не діє.
- */
+  Тримає апарат на рейці ДО пострілу. Ніякої фізики: ні аеродинаміки, ні тяги,
+  ні гравітації, ні земляного коду — апарат просто стоїть там, де його поставили
+  (у т.ч. на висоті launcher_hold_height), з тангажем launcher_pitch.
+
+  Чому саме так: будь-яка «жива» динаміка на землі чи біля неї дає IMU
+  прискорення/обертання, і EKF у цей момент або не вирівнюється, або «крутить»
+  апарат (заміряно: тангаж 89°, крен ±125°, «висота» до 277 м, GPS не фіксується).
+*/
 void Plane::hold_on_launcher()
 {
     // position.z — NED (додатне вниз). Формула дзеркальна до Aircraft::hagl():
@@ -519,31 +522,46 @@ void Plane::hold_on_launcher()
                    + ground_height_difference()) - launcher_hold_height;
 
     velocity_ef.zero();
+    velocity_air_ef.zero();
+    velocity_air_bf.zero();
     gyro.zero();
 
     float r, p, y;
     dcm.to_euler(&r, &p, &y);
     dcm.from_euler(0.0f, launcher_pitch, y);   // крила рівно, ніс під заданим кутом
 
-    // ВАЖЛИВО: accel_body НЕ обнуляємо. Саме він іде в IMU, і якщо віддати нуль,
-    // акселерометр показує 0 g — EKF втрачає вертикаль і «вуса/висота» розлітаються
-    // (перевірено: alt стрибнув до 277 м, тангаж -27°). Нехай update_dynamics
-    // додає гравітацію як завжди; рух усе одно зафіксований через velocity_ef.
+    // Апарат стоїть нерухомо, тому акселерометр мусить показувати рівно 1 g:
+    // те саме, що update_dynamics() рахує для стану спокою (рядок 648).
+    accel_body = dcm.transposed() * Vector3f(0.0f, 0.0f, -GRAVITY_MSS);
+
+    // «мертва» швидкість для всіх споживачів (приймач швидкості, логи, EKF)
+    airspeed = 0.0f;
+    airspeed_pitot = 0.0f;
 }
 
 void Plane::update(const struct sitl_input &input)
 {
     Vector3f rot_accel;
 
+    if (have_launcher && !launcher_fired && launcher_hold_height > 0.0f) {
+        if (input.servos[6] > 1700) {
+            // гачок смикнули — цей такт уже йде звичайна фізика
+            launcher_fired = true;
+        } else {
+            // ПОВНІСТЮ без фізики: стоїмо на рейці там, де нас поставили
+            hold_on_launcher();
+            update_position();
+            time_advance();
+            update_mag_field_bf();
+            return;
+        }
+    }
+
     update_wind(input);
     
     calculate_forces(input, rot_accel);
     
     update_dynamics(rot_accel);
-
-    if (have_launcher && !launcher_fired && launcher_hold_height > 0.0f) {
-        hold_on_launcher();
-    }
 
     update_external_payload(input);
 
