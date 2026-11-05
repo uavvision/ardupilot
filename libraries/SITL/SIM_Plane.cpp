@@ -35,6 +35,10 @@ Plane::Plane(const char *frame_str) :
     inertia_pitch = 1.0f;
     inertia_yaw = 1.0f;
     launch_accel_z = 0.0f;
+    // утримання на рейці вимкнене (0 = як у старих фреймів: одразу на землі)
+    launcher_fired = false;
+    launcher_hold_height = 0.0f;
+    launcher_pitch = 0.0f;
 
     /*
        scaling from motor power to Newtons. Allows the plane to hold
@@ -151,20 +155,22 @@ Plane::Plane(const char *frame_str) :
             28.6 м/с (V при CL(0)=0.56, що дає L=W), і аж тоді підйомна сила
             перевищить вагу без тангажу.
 
-          РІШЕННЯ: горизонтальна рейка + вільна кутова динаміка на землі
-          (див. GROUND_BEHAVIOR_NONE у блоці маси).
+          РІШЕННЯ: «стояти на рейці» — 1 м над землею, ніс 15° вгору, нульова
+          швидкість, поки не смикнули гачок (див. launcher_hold_* у заголовку).
+          Через це земляний код SITL взагалі не задіюється: `on_ground()`
+          дає false (hagl = 1 м), кутова динаміка вільна, тертя 0.3*V відсутнє.
 
-              30 м/с² x 1.0 с -> 100*(1-e^(-0.3)) = 25.9 м/с на виході
-                                 (тертя об землю 0.3*V уже враховано)
-          Це вище зриву (18.4 м/с), і після сходу з рейки ArduPlane дає
-          TAKEOFF-профіль: 10° тангажа, TKOFF_THR_MAX. Вертикальну складову
-          (launch_accel_z) не використовуємо: у апстрімі вона штовхає ВНИЗ
-          (+launch_accel/3, тобто -8...-10 м/с за прогін) — на 30 кг це вбивало
-          апарат у землю, а для підйому достатньо керма висоти.
+          Рейка йде ВЗДОВЖ ОСІ ФЮЗЕЛЯЖА, а ніс уже піднятий на 15°, тому
+          нахил рейки виходить сам собою: прискорення 28 м/с² вздовж 15° — це
+          ~7.2 м/с² вгору і ~27 м/с² вперед, окремої vertical-складової
+          (launch_accel_z) не потрібно. На виході (0.9 с) — близько 26-28 м/с
+          під 15° угору, тобто відразу в наборі висоти, вище зриву (18.4 м/с).
         */
-        launch_accel = 30;
-        launch_time = 1.0f;
+        launch_accel = 28;
+        launch_time = 0.9f;
         launch_accel_z = 0.0f;
+        launcher_hold_height = 1.0f;          // метр над землею
+        launcher_pitch = radians(15.0f);      // ніс угору
     }
     if (strstr(frame_str, "-tailsitter")) {
         tailsitter = true;
@@ -408,7 +414,15 @@ void Plane::calculate_forces(const struct sitl_input &input, Vector3f &rot_accel
         throttle = filtered_servo_range(input, 2);
     }
     
-    float thrust     = throttle;
+    /*
+      Поки апарат зафіксований на рейці, тяга НЕ діє: інакше акселерометр
+      бачить thrust + гравітацію, і EKF, який ще вирівнюється, отримує хибну
+      «вертикаль» (перевірено: тангаж 89°, крен ±125° ще до пострілу). На рейці
+      тягу тримає сама катапульта, двигун працює «на холостих».
+    */
+    const bool on_launcher = have_launcher && !launcher_fired && launcher_hold_height > 0.0f;
+
+    float thrust     = on_launcher ? 0.0f : throttle;
 
     battery_voltage = sitl->batt_voltage - 0.7*throttle;
     battery_current = (battery_voltage/sitl->batt_voltage)*50.0f*sq(throttle);
@@ -446,6 +460,10 @@ void Plane::calculate_forces(const struct sitl_input &input, Vector3f &rot_accel
             uint64_t now = AP_HAL::millis64();
             if (launch_start_ms == 0) {
                 launch_start_ms = now;
+                // запам'ятовуємо, що рейка вже відпрацювала: інакше після
+                // відпускання гачка launch_start_ms скидається в 0 і апарат
+                // знову «прилип» би до стартової позиції
+                launcher_fired = true;
             }
             if (now - launch_start_ms < launch_time*1000) {
                 force.x += mass * launch_accel;
@@ -487,6 +505,32 @@ void Plane::calculate_forces(const struct sitl_input &input, Vector3f &rot_accel
 /*
   update the plane simulation by one time step
  */
+/*
+  Тримає апарат на рейці ДО пострілу: задана висота над землею, заданий тангаж,
+  нульова швидкість. Викликається після update_dynamics(), тому перекриває і
+  гравітацію, і земляний код; поки це діє, `on_ground()` дає false (hagl > 0),
+  тобто кутова динаміка вільна і тертя 0.3*V не діє.
+ */
+void Plane::hold_on_launcher()
+{
+    // position.z — NED (додатне вниз). Формула дзеркальна до Aircraft::hagl():
+    // hagl = -position.z + home.alt*0.01 - ground_level - frame_height - ghd
+    position.z = -(ground_level + frame_height - home.alt * 0.01f
+                   + ground_height_difference()) - launcher_hold_height;
+
+    velocity_ef.zero();
+    gyro.zero();
+
+    float r, p, y;
+    dcm.to_euler(&r, &p, &y);
+    dcm.from_euler(0.0f, launcher_pitch, y);   // крила рівно, ніс під заданим кутом
+
+    // ВАЖЛИВО: accel_body НЕ обнуляємо. Саме він іде в IMU, і якщо віддати нуль,
+    // акселерометр показує 0 g — EKF втрачає вертикаль і «вуса/висота» розлітаються
+    // (перевірено: alt стрибнув до 277 м, тангаж -27°). Нехай update_dynamics
+    // додає гравітацію як завжди; рух усе одно зафіксований через velocity_ef.
+}
+
 void Plane::update(const struct sitl_input &input)
 {
     Vector3f rot_accel;
@@ -496,6 +540,11 @@ void Plane::update(const struct sitl_input &input)
     calculate_forces(input, rot_accel);
     
     update_dynamics(rot_accel);
+
+    if (have_launcher && !launcher_fired && launcher_hold_height > 0.0f) {
+        hold_on_launcher();
+    }
+
     update_external_payload(input);
 
     // update lat/lon/altitude

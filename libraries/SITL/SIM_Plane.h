@@ -140,6 +140,20 @@ protected:
     float launch_time;
     uint64_t launch_start_ms;
 
+    /*
+      «Стоїть на рейці» — стан ДО пострілу. Поки `launcher_fired == false`,
+      апарат тримається нерухомо: `launcher_hold_height` метрів над землею з
+      тангажем `launcher_pitch`. Це прибирає дві проблеми, які коштували
+      кількох ітерацій:
+        * земляний код SITL (`on_ground()`) на землі глушить кутову динаміку,
+          тому апарат не міг «взяти ніс» і відірватися;
+        * на землі діє тертя `0.3*V`, яке з'їдало швидкість рейки.
+      `launcher_hold_height == 0` вимикає утримання (усі старі фрейми).
+    */
+    bool launcher_fired;
+    float launcher_hold_height;
+    float launcher_pitch;
+
     const uint8_t throttle_servo = 2;
     const int8_t choke_servo = 14;
     const int8_t ignition_servo = 12;
@@ -153,6 +167,9 @@ protected:
         slewrate,
         true
     };
+
+    /* зафіксувати апарат на рейці: висота, тангаж, нульова швидкість */
+    void hold_on_launcher();
 
     float liftCoeff(float alpha) const;
     float dragCoeff(float alpha) const;
