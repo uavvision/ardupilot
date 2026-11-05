@@ -31,6 +31,7 @@ Plane::Plane(const char *frame_str) :
 
     // типові значення: поправка гвинта вимкнена, момент не ділиться на інерцію
     prop_v_pitch = 0.0f;
+    prop_windmill_drag = 0.0f;
     inertia_roll = 1.0f;
     inertia_pitch = 1.0f;
     inertia_yaw = 1.0f;
@@ -98,9 +99,14 @@ Plane::Plane(const char *frame_str) :
         coefficient.c = 0.44f;
         // паразитний опір планера з тих самих двох точок (на крейсері L/D ~11)
         coefficient.c_drag_p = 0.027f;
-        // інерції: Ixx підібрано так, щоб tau_roll = 146 мс (замір борта):
-        //   tau = 2*I*V / (q*S*b^2*|c_l_p|) = 0.0197*I  ->  I = 7.4
-        inertia_roll = 7.4f;
+        /*
+          Інерції. Перша оцінка була Ixx = 7.4 (з формули
+          tau = 2*I*V/(q*S*b^2*|c_l_p|) = 0.0197*I), але compare_real.py на
+          прогоні 10-04-09 заміряв tau = 272.6 мс проти 145.7 мс у борта,
+          тобто рівно в 1.87 раза повільніше. Оскільки tau ∝ I,
+          Ixx = 7.4/1.87 ≈ 4.0.
+        */
+        inertia_roll = 4.0f;
         inertia_pitch = 6.0f;
         inertia_yaw = 13.4f;
     }
@@ -171,6 +177,15 @@ Plane::Plane(const char *frame_str) :
         launch_accel_z = 0.0f;
         launcher_hold_height = 1.0f;          // метр над землею
         launcher_pitch = radians(15.0f);      // ніс угору
+        /*
+          Опір гвинта, що вільно обертається. Без нього модель планерує з
+          L/D ≈ 12 і в заході на нульовому газу розганяється до 39 м/с
+          (141 км/г), тоді як реальний борт у тому ж режимі тримає ~28 м/с
+          (замір по логу: 28.2 м/с, зниження 5.2 м/с → L/D 5.4).
+          На 28 м/с доданок дає 28 Н, що разом з аеродинамічним опором
+          (24.6 Н) якраз урівноважує складову ваги 54 Н.
+        */
+        prop_windmill_drag = 1.0f;
     }
     if (strstr(frame_str, "-tailsitter")) {
         tailsitter = true;
@@ -485,6 +500,16 @@ void Plane::calculate_forces(const struct sitl_input &input, Vector3f &rot_accel
     if (prop_v_pitch > 0) {
         // гвинт втрачає тягу зі швидкістю: T = T0 * (1 - V/V_pitch)
         thrust *= constrain_float(1.0f - airspeed / prop_v_pitch, 0.0f, 1.0f);
+    }
+
+    if (prop_windmill_drag > 0 && throttle < 0.25f) {
+        /*
+          Вітрянка: на холостих гвинт гальмує, а не тягне. Лінійно від
+          25 % газу до нуля — саме цей доданок прибирає «планерний» розгін
+          у пікіруванні (див. проп_windmill_drag у заголовку).
+        */
+        const float windmill = (0.25f - throttle) / 0.25f;
+        force.x -= prop_windmill_drag * airspeed * windmill;
     }
 
     accel_body = Vector3f(thrust, 0, 0) + force;
