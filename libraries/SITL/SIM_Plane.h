@@ -163,6 +163,7 @@ protected:
     bool launcher_fired;
     float launcher_hold_height;
     float launcher_pitch;
+    float launcher_yaw;
 
     const uint8_t throttle_servo = 2;
     const int8_t choke_servo = 14;
@@ -180,6 +181,16 @@ protected:
 
     /* зафіксувати апарат на рейці: висота, тангаж, нульова швидкість */
     void hold_on_launcher();
+
+    /*
+      Рух по рейці після пострілу. На відміну від старого «просто додати
+      mass*launch_accel до сили», тут апарат ЖОРСТКО ведеться вздовж рейки:
+      тангаж/курс тримаються, швидкість = launch_accel*t, вертикальна
+      складова = V*sin(launcher_pitch). Гравітація не «з'їдає» ніс, тому
+      на виході апарат має реальні +5…7 м/с вертикальної швидкості, як
+      справжня катапульта, а не провалюється на 0.2–0.3 м за постріл.
+    */
+    void update_on_rail(const struct sitl_input &input);
 
     float liftCoeff(float alpha) const;
     float dragCoeff(float alpha) const;

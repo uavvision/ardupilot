@@ -40,6 +40,7 @@ Plane::Plane(const char *frame_str) :
     launcher_fired = false;
     launcher_hold_height = 0.0f;
     launcher_pitch = 0.0f;
+    launcher_yaw = 0.0f;
 
     /*
        scaling from motor power to Newtons. Allows the plane to hold
@@ -467,9 +468,12 @@ void Plane::calculate_forces(const struct sitl_input &input, Vector3f &rot_accel
     rot_accel.y /= inertia_pitch;
     rot_accel.z /= inertia_yaw;
 
-    if (have_launcher) {
+    if (have_launcher && launcher_hold_height <= 0.0f) {
         /*
-          simple simulation of a launcher
+          simple simulation of a launcher для старих фреймів.
+          Для -canard30 (launcher_hold_height > 0) рейка реалізована
+          окремо в update_on_rail(): там швидкість/тангаж задаються
+          жорстко, а не додаванням сили, яку гравітація з'їдає.
          */
         if (launch_triggered) {
             uint64_t now = AP_HAL::millis64();
@@ -553,7 +557,8 @@ void Plane::hold_on_launcher()
 
     float r, p, y;
     dcm.to_euler(&r, &p, &y);
-    dcm.from_euler(0.0f, launcher_pitch, y);   // крила рівно, ніс під заданим кутом
+    launcher_yaw = y;
+    dcm.from_euler(0.0f, launcher_pitch, launcher_yaw);   // крила рівно, ніс під заданим кутом
 
     // Апарат стоїть нерухомо, тому акселерометр мусить показувати рівно 1 g:
     // те саме, що update_dynamics() рахує для стану спокою (рядок 648).
@@ -564,22 +569,71 @@ void Plane::hold_on_launcher()
     airspeed_pitot = 0.0f;
 }
 
+void Plane::update_on_rail(const struct sitl_input &input)
+{
+    const uint64_t now = AP_HAL::millis64();
+    const float elapsed = constrain_float((now - launch_start_ms) * 0.001f, 0.0f, launch_time);
+    const float rail_speed = launch_accel * elapsed;
+
+    // рейка тримає апарат: крила рівно, ніс під launcher_pitch, курс не змінюється
+    dcm.from_euler(0.0f, launcher_pitch, launcher_yaw);
+    gyro.zero();
+
+    // швидкість строго вздовж рейки (вісь +x тіла), а не «тяга мінус гравітація»
+    velocity_ef = dcm * Vector3f(rail_speed, 0.0f, 0.0f);
+
+    // акселерометр бачить прискорення рейки + 1 g (це те, що бачить реальний IMU)
+    const Vector3f rail_accel_ef = dcm * Vector3f(launch_accel, 0.0f, 0.0f);
+    accel_body = dcm.transposed() * (rail_accel_ef + Vector3f(0.0f, 0.0f, -GRAVITY_MSS));
+
+    // повітряні величини — з тією ж конвенцією, що в update_dynamics()
+    update_wind(input);
+    velocity_air_ef = velocity_ef - wind_ef;
+    velocity_air_bf = dcm.transposed() * velocity_air_ef;
+    airspeed = velocity_air_ef.length();
+    airspeed_pitot = constrain_float(velocity_air_bf * Vector3f(1.0f, 0.0f, 0.0f), 0.0f, 120.0f);
+
+    // тяга та RPM для логів/ESC (фізику рейки не змінюють)
+    const float throttle = filtered_servo_range(input, throttle_servo);
+    battery_voltage = sitl->batt_voltage - 0.7f * throttle;
+    battery_current = (battery_voltage / sitl->batt_voltage) * 50.0f * sq(throttle);
+    motor_mask |= (1U << throttle_servo);
+    rpm[throttle_servo] = throttle * 7000.0f;
+
+    // інтегруємо позицію вздовж рейки
+    const float dt = frame_time_us * 1.0e-6f;
+    position += (velocity_ef * dt).todouble();
+    update_position();
+    time_advance();
+    update_mag_field_bf();
+}
+
 void Plane::update(const struct sitl_input &input)
 {
     Vector3f rot_accel;
 
     if (have_launcher && !launcher_fired && launcher_hold_height > 0.0f) {
         if (input.servos[6] > 1700) {
-            // гачок смикнули — цей такт уже йде звичайна фізика
+            // гачок смикнули — стартуємо рух по рейці
             launcher_fired = true;
-        } else {
-            // ПОВНІСТЮ без фізики: стоїмо на рейці там, де нас поставили
-            hold_on_launcher();
-            update_position();
-            time_advance();
-            update_mag_field_bf();
+            launch_start_ms = AP_HAL::millis64();
+            update_on_rail(input);
             return;
         }
+        // ПОВНІСТЮ без фізики: стоїмо на рейці там, де нас поставили
+        hold_on_launcher();
+        update_position();
+        time_advance();
+        update_mag_field_bf();
+        return;
+    }
+
+    // перші launch_time секунд після пострілу — апарат ще на рейці:
+    // тангаж/курс/напрямок швидкості задає катапульта, а не аеродинаміка
+    if (have_launcher && launcher_fired && launch_start_ms != 0 &&
+        (AP_HAL::millis64() - launch_start_ms) < uint64_t(launch_time * 1000.0f)) {
+        update_on_rail(input);
+        return;
     }
 
     update_wind(input);
