@@ -166,3 +166,6 @@ ENV/
 env.bak/
 venv.bak/
 autotest_result_*_junit.xml
+
+# Симлінк на нашу JSBSim-модель, його робить tests/sitl/run_scenario.sh
+/Tools/autotest/aircraft/canard30

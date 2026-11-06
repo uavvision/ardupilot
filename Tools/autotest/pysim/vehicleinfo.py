@@ -312,6 +312,26 @@ class VehicleInfo(object):
                 "waf_target": "bin/arduplane",
                 "default_params_filename": "models/plane.parm",
             },
+            # Той самий 30-кг канард, але фізика — JSBSim, а не SIM_Plane.
+            #
+            # `model` мусить містити "jsbsim:<name>": SIM_JSBSim бере ім'я
+            # ПІСЛЯ двокрапки і шукає <autotest>/aircraft/<name>/, а префікс
+            # "jsbsim" обирає сам бекенд (SIM_Aircraft::create). Тому фрейм
+            # не можна назвати просто "jsbsim-canard30" без поля "model" —
+            # тоді JSBSim шукав би модель "jsbsim-canard30".
+            #
+            # Сама модель лежить у нашому репо, а не в сабмодулі:
+            # tests/sitl/jsbsim/aircraft/canard30, run_scenario.sh робить на
+            # неї симлінк у Tools/autotest/aircraft/canard30.
+            #
+            # external=True — бо JSBSim запускається як окремий процес
+            # (execlp("JSBSim")), а не лінкується в arduplane.
+            "jsbsim-canard30": {
+                "waf_target": "bin/arduplane",
+                "model": "jsbsim:canard30",
+                "default_params_filename": "default_params/plane-jsbsim.parm",
+                "external": True,
+            },
             "plane-ice": {
                 "waf_target": "bin/arduplane",
                 "default_params_filename": ["models/plane.parm", "default_params/plane-ice.parm"],
