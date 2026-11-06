@@ -499,6 +499,23 @@ void JSBSim::send_servos(const struct sitl_input &input)
         rudder   = (ch2+ch1)/2.0f;
     }
     float wind_speed_fps = input.wind.speed / FEET_TO_METERS;
+
+    /*
+      Турбулентність JSBSim (atmosphere/turb-type 4 = Tustin/Dryden за
+      MIL-F-8785C) масштабується ДВОМА числами: швидкістю вітру на 20 фт і
+      `severity`, яка є ІНДЕКСОМ 0..7 (0 вимикає генератор; light = 3 при
+      25 фт/с, moderate = 4 при 50, severe = 6 при 75 — див. таблицю в
+      FGWinds.h). SITL завжди брав цю швидкість як `wind/3`, тому в штиль
+      (SIM_WIND_SPD 0) турбулентності не було б зовсім, хоч би що стояло в
+      severity. Через це в штиль підставляємо номінальні 25 фт/с (рівень
+      "light"), і єдиним регулятором інтенсивності лишається severity —
+      саме те, що потрібно для «штиль + справжня модель турбулентності».
+    */
+    float turb_speed_fps = wind_speed_fps / 3;
+    if (input.wind.turbulence > 0.5f && turb_speed_fps < 25.0f) {
+        turb_speed_fps = 25.0f;
+    }
+
     asprintf(&buf,
              "set fcs/aileron-cmd-norm %f\n"
              "set fcs/elevator-cmd-norm %f\n"
@@ -512,7 +529,7 @@ void JSBSim::send_servos(const struct sitl_input &input)
              aileron, elevator, rudder, throttle,
              radians(input.wind.direction),
              wind_speed_fps,
-             wind_speed_fps/3,
+             turb_speed_fps,
              input.wind.turbulence);
     ssize_t buflen = strlen(buf);
     ssize_t sent = sock_control.send(buf, buflen);
