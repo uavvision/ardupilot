@@ -72,6 +72,10 @@ private:
     std::string jsbsim_model = "Rascal";
     std::string jsbsim_variant;
 
+    // Після відриву земля більше не «вбиває» апарат (як has_taken_off у
+    // SIM_Plane): у JSBSim контактні точки живуть у FDM, тому гасимо їх
+    // runtime-командою `gear/gear[i]/maximum-force-lbs 0`.
+    bool ground_disabled;
     bool created_templates;
     bool started_jsbsim;
     bool opened_control_socket;
@@ -93,6 +97,9 @@ private:
     bool expect(const char *str) const;
 
     void drain_control_socket();
+
+    // вимикає контакт з землею після відриву (див. .cpp)
+    void disable_ground_after_takeoff(void);
 };
 
 /*

@@ -71,6 +71,7 @@ JSBSim::JSBSim(const char *frame_str) :
     initialised(false),
     jsbsim_script(nullptr),
     jsbsim_fgout(nullptr),
+    ground_disabled(false),
     created_templates(false),
     started_jsbsim(false),
     opened_control_socket(false),
@@ -602,6 +603,60 @@ void JSBSim::drain_control_socket()
 /*
   update the JSBSim simulation by one time step
  */
+/*
+  Після відриву земля більше не «вбиває» апарат — так само, як у SIM_Plane,
+  де `Aircraft::on_ground()` фіксує `has_taken_off` при hagl() > 0.2 м і далі
+  завжди повертає false (AGENTS §7.10). Різниця в тому, що в JSBSim земля
+  живе всередині FDM, тому її треба вимкнути явно.
+
+  Механізм — штатна **ретракція шасі**: у `FGLGear::CalcForce()` увесь
+  розрахунок контакту виконується лише при `gearPos > 0.99` («шасі
+  випущене»). Тому всі контакти в моделі позначені
+  `<retractable>1</retractable>`, а тут ми «прибираємо шасі»: `gear-pos-norm 0`
+  вимикає всі опори одразу, per-unit `pos-norm` — страховка, якщо FCS колись
+  чіпатиме глобальний канал.
+
+  Що для цього НЕ працює (перевірено офлайн, щоб не витрачати прогін):
+  `maximum-force-lbs 0` — no-op (StrutForce завжди ≤ 0, а кламп порівнює з
+  додатним максимумом); `z-position -10000` — апарат провалюється, але
+  JSBSim падає з `Floating point exception`.
+
+  Навіщо це в харнесі: під час заходу на ціль апарат інколи проходить нижче
+  рівня смуги, і без цього JSBSim «ловить» його об землю (удар, стрибок
+  кутових швидкостей), що псує і політ, і запис. Для тестів наведення земля
+  під час польоту не потрібна.
+ */
+void JSBSim::disable_ground_after_takeoff(void)
+{
+    if (ground_disabled || hagl() <= 1.0f) {
+        return;
+    }
+    ground_disabled = true;
+    /*
+      per-unit імена залежать від типу контакту (FGLGear::bind():
+      `gear/unit[i]` для BOGEY, `contact/unit[i]` для STRUCTURE). У моделі
+      3 BOGEY + 2 STRUCTURE = 5 контактів; для неіснуючих індексів консоль
+      JSBSim лише попереджає.
+    */
+    char buf[1024];
+    int n = snprintf(buf, sizeof(buf),
+                     "set gear/gear-pos-norm 0\n"
+                     "set gear/unit[0]/pos-norm 0\n"
+                     "set gear/unit[1]/pos-norm 0\n"
+                     "set gear/unit[2]/pos-norm 0\n"
+                     "set gear/unit[3]/pos-norm 0\n"
+                     "set gear/unit[4]/pos-norm 0\n"
+                     "set contact/unit[0]/pos-norm 0\n"
+                     "set contact/unit[1]/pos-norm 0\n"
+                     "set contact/unit[2]/pos-norm 0\n"
+                     "set contact/unit[3]/pos-norm 0\n"
+                     "set contact/unit[4]/pos-norm 0\n");
+    if (n > 0 && n < (int)sizeof(buf)) {
+        sock_control.send(buf, n);
+    }
+    printf("JSBSim: hagl=%.1f м — землю вимкнено на решту польоту\n", hagl());
+}
+
 void JSBSim::update(const struct sitl_input &input)
 {
     while (!initialised) {
@@ -616,6 +671,7 @@ void JSBSim::update(const struct sitl_input &input)
     }
     send_servos(input);
     recv_fdm(input);
+    disable_ground_after_takeoff();
     // Крок FDM обмежений тією ж стелею, що й `--simulation-rate`: інакше
     // SITL рахує час як 1/1200 с на ітерацію, а пакетів приходить 400/с,
     // і симуляція йде втричі повільніше за реальний час.
