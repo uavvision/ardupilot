@@ -207,14 +207,20 @@ Plane::Plane(const char *frame_str) :
         launcher_hold_height = 1.0f;          // метр над землею
         launcher_pitch = radians(15.0f);      // ніс угору
         /*
-          Опір гвинта, що вільно обертається. Без нього модель планерує з
-          L/D ≈ 12 і в заході на нульовому газу розганяється до 39 м/с
-          (141 км/г), тоді як реальний борт у тому ж режимі тримає ~28 м/с
-          (замір по логу: 28.2 м/с, зниження 5.2 м/с → L/D 5.4).
-          На 28 м/с доданок дає 28 Н, що разом з аеродинамічним опором
-          (24.6 Н) якраз урівноважує складову ваги 54 Н.
+          Опір гвинта, що вільно обертається, Н на (м/с)². Без нього модель
+          планерує з L/D ≈ 12 і в заході на нульовому газу розганяється до
+          39 м/с (141 км/г), тоді як реальний борт у тому ж режимі тримає
+          ~28 м/с (замір по логу: 28.1 м/с, зниження 5.38 м/с → L/D 5.4).
+
+          КВАДРАТИЧНИЙ, а не лінійний (Step 98). Лінійна 1.0·V давала на
+          28 м/с майже правильні 28 Н, тому дефект довго не було видно, але
+          на 43 м/с — лише 43 Н замість 74, і в пікіруванні 17–19° апарат
+          тікав до 155 км/г. Замір по real/00000006.BIN (газ <= 5 %, сталі
+          ділянки): повний опір 55.4 Н при 28.1 м/с, з них аеродинаміка
+          24.3 Н, решта 31.1 Н — гвинт, тобто 0.040·V². Фізика та сама:
+          D ∝ ρ·n²·D⁴, а оберти вільного гвинта n ∝ V.
         */
-        prop_windmill_drag = 1.0f;
+        prop_windmill_drag = 0.040f;
     }
     if (strstr(frame_str, "-tailsitter")) {
         tailsitter = true;
@@ -554,15 +560,16 @@ void Plane::calculate_forces(const struct sitl_input &input, Vector3f &rot_accel
 
     if (prop_windmill_drag > 0 && throttle < prop_windmill_throttle) {
         /*
-          Вітрянка: на малому газі гвинт гальмує, а не тягне. Лінійно від
-          prop_windmill_throttle до нуля — саме цей доданок прибирає
-          «планерний» розгін у пікіруванні (див. prop_windmill_drag).
+          Вітрянка: на малому газі гвинт гальмує, а не тягне. Спад від
+          prop_windmill_throttle до нуля задає prop_windmill_exponent, а сама
+          сила пропорційна V² (див. prop_windmill_drag) — саме цей доданок
+          прибирає «планерний» розгін у пікіруванні.
         */
         float windmill = (prop_windmill_throttle - throttle) / prop_windmill_throttle;
         if (fabsf(prop_windmill_exponent - 1.0f) > 1.0e-6f) {
             windmill = powf(windmill, prop_windmill_exponent);
         }
-        force.x -= prop_windmill_drag * airspeed * windmill;
+        force.x -= prop_windmill_drag * airspeed * airspeed * windmill;
     }
 
     accel_body = Vector3f(thrust, 0, 0) + force;

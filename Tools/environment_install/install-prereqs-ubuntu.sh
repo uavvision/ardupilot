@@ -265,8 +265,8 @@ elif [ ${RELEASE_CODENAME} == 'lunar' ]; then
     SITL_PKGS+=" libpython3-stdlib" # for argparse
 elif [ ${RELEASE_CODENAME} == 'buster' ]; then
     SITL_PKGS+=" libpython3-stdlib" # for argparse
-elif [ ${RELEASE_CODENAME} != 'mantic' ]; then
-  SITL_PKGS+=" python-argparse"
+#elif [ ${RELEASE_CODENAME} != 'mantic' ]; then
+#  SITL_PKGS+=" python-argparse"
 fi
 
 # Check for graphical package for MAVProxy
