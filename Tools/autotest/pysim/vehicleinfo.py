@@ -312,7 +312,7 @@ class VehicleInfo(object):
                 "waf_target": "bin/arduplane",
                 "default_params_filename": "models/plane.parm",
             },
-            # Той самий 30-кг канард, але фізика — JSBSim, а не SIM_Plane.
+            # Той самий 29.5-кг канард, але фізика — JSBSim, а не SIM_Plane.
             #
             # `model` мусить містити "jsbsim:<name>": SIM_JSBSim бере ім'я
             # ПІСЛЯ двокрапки і шукає <autotest>/aircraft/<name>/, а префікс
@@ -320,15 +320,35 @@ class VehicleInfo(object):
             # не можна назвати просто "jsbsim-canard30" без поля "model" —
             # тоді JSBSim шукав би модель "jsbsim-canard30".
             #
+            # Третя частина ("jsbsim:canard30:air") — ВАРІАНТ СТАРТОВОГО
+            # СТАНУ: SIM_JSBSim підставляє його в
+            # aircraft/canard30/reset_template_<variant>.xml.
+            #
             # Сама модель лежить у нашому репо, а не в сабмодулі:
             # tests/sitl/jsbsim/aircraft/canard30, run_scenario.sh робить на
             # неї симлінк у Tools/autotest/aircraft/canard30.
             #
             # external=True — бо JSBSim запускається як окремий процес
             # (execlp("JSBSim")), а не лінкується в arduplane.
+            #
+            # Два фрейми, бо в них різні стартові стани і різне живлення GPS:
+            #   * `jsbsim-canard30`     — ЗПС, ArduPlane у TAKEOFF сам
+            #     розганяє й відриває. Апарат до арму НЕРУХОМИЙ, тому
+            #     `gps_input.source = fixed` каже правду, і EKF сходиться без
+            #     "Roll/Pitch inconsistent". Це типовий фрейм;
+            #   * `jsbsim-canard30-air` — 160 м і 28 м/с у повітрі, лише для
+            #     швидких тестів. Вимагає `--gps-source sim` (його ставить
+            #     run_scenario.sh): у fixed EKF бачить нульову швидкість,
+            #     поки апарат летить 28 м/с, і розсипається.
             "jsbsim-canard30": {
                 "waf_target": "bin/arduplane",
                 "model": "jsbsim:canard30",
+                "default_params_filename": "default_params/plane-jsbsim.parm",
+                "external": True,
+            },
+            "jsbsim-canard30-air": {
+                "waf_target": "bin/arduplane",
+                "model": "jsbsim:canard30:air",
                 "default_params_filename": "default_params/plane-jsbsim.parm",
                 "external": True,
             },

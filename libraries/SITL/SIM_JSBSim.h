@@ -26,6 +26,8 @@
 
 #if HAL_SIM_JSBSIM_ENABLED
 
+#include <string>
+
 #include <AP_HAL/utility/Socket_native.h>
 
 #include "SIM_Aircraft.h"
@@ -62,8 +64,13 @@ private:
     char *jsbsim_fgout;
     int jsbsim_stdout;
 
-    // default JSBSim model
-    const char *jsbsim_model = "Rascal";
+    // default JSBSim model. Frame string is either "jsbsim:<model>" or
+    // "jsbsim:<model>:<variant>"; the optional variant picks the start
+    // state aircraft/<model>/reset_template_<variant>.xml (e.g. "air"
+    // for the airborne start), while reset_template.xml stays the default
+    // runway one.
+    std::string jsbsim_model = "Rascal";
+    std::string jsbsim_variant;
 
     bool created_templates;
     bool started_jsbsim;

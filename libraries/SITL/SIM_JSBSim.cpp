@@ -84,15 +84,35 @@ JSBSim::JSBSim(const char *frame_str) :
     } else {
         frame = FRAME_NORMAL;
     }
+    /*
+      Frame string: "jsbsim:<model>[:<variant>]".
+
+      Друга двокрапка — це ВАРІАНТ СТАРТОВОГО СТАНУ, а не частина назви
+      моделі: `jsbsim:canard30:air` означає модель `canard30` і шаблон
+      `aircraft/canard30/reset_template_air.xml`. Потрібно тому, що
+      канард має два принципово різні старти (ЗПС і повітря), і вони не
+      можуть жити в одному reset_template.xml: повітряний старт без
+      GPS-швидкості ламає EKF (див. reset_template.xml у теці моделі).
+    */
     const char *model_name = strchr(frame_str, ':');
     if (model_name != nullptr) {
-        jsbsim_model = model_name + 1;
+        const char *spec = model_name + 1;
+        const char *variant = strchr(spec, ':');
+        if (variant == nullptr) {
+            jsbsim_model = spec;
+        } else {
+            jsbsim_model.assign(spec, variant - spec);
+            jsbsim_variant = variant + 1;
+        }
     }
     control_port = 5505 + instance*10;
     fdm_port = 5504 + instance*10;
 
-    printf("JSBSim backend started: control_port=%u fdm_port=%u\n",
-           control_port, fdm_port);
+    printf("JSBSim backend started: control_port=%u fdm_port=%u model='%s'\n",
+           control_port, fdm_port, jsbsim_model.c_str());
+    printf("JSBSim_model: '%s' variant: '%s'\n",
+           jsbsim_model.c_str(),
+           jsbsim_variant.empty() ? "(none)" : jsbsim_variant.c_str());
 }
 
 /*
@@ -178,17 +198,22 @@ bool JSBSim::create_templates(void)
     printf("JSBSim_fgout: '%s'\n", jsbsim_fgout);
 
     /*
-      Якщо в теці моделі є reset_template.xml, стартовий стан беремо з
-      нього (див. нижче), а trim-подію не додаємо: trim вимагає
+      Якщо в теці моделі є reset_template.xml (або
+      reset_template_<variant>.xml для фрейму з варіантом), стартовий стан
+      беремо з нього (див. нижче), а trim-подію не додаємо: trim вимагає
       працюючої propulsion-моделі, а вона в нашому канарді замінена
       external_reactions. Без шаблону поведінка та сама, що завжди.
     */
-    char *jsbsim_reset_template;
-    asprintf(&jsbsim_reset_template, "%s/aircraft/%s/reset_template.xml",
-             autotest_dir, jsbsim_model);
-    const bool use_reset_template = access(jsbsim_reset_template, R_OK) == 0;
+    std::string jsbsim_reset_template = std::string(autotest_dir) +
+        "/aircraft/" + jsbsim_model + "/reset_template";
+    if (!jsbsim_variant.empty()) {
+        jsbsim_reset_template += "_" + jsbsim_variant;
+    }
+    jsbsim_reset_template += ".xml";
+    const bool use_reset_template = access(jsbsim_reset_template.c_str(), R_OK) == 0;
     printf("JSBSim_reset_template: '%s' %s\n",
-           jsbsim_reset_template, use_reset_template ? "(used)" : "(absent)");
+           jsbsim_reset_template.c_str(),
+           use_reset_template ? "(used)" : "(absent)");
 
     FILE *f = fopen(jsbsim_script, "w");
     if (f == nullptr) {
@@ -219,9 +244,9 @@ bool JSBSim::create_templates(void)
 "      <set name=\"propulsion/engine[0]/set-running\" value=\"1\"/>\n"
 "      <notify/>\n"
 "    </event>\n",
-            jsbsim_model,
-            jsbsim_model,
-            jsbsim_model,
+            jsbsim_model.c_str(),
+            jsbsim_model.c_str(),
+            jsbsim_model.c_str(),
             control_port,
             1.0/jsbsim_rate_hz(rate_hz));
     if (!use_reset_template) {
@@ -250,21 +275,21 @@ bool JSBSim::create_templates(void)
             fdm_port, jsbsim_rate_hz(rate_hz));
     fclose(f);
 
-    char *jsbsim_reset;
-    asprintf(&jsbsim_reset, "%s/aircraft/%s/reset.xml", autotest_dir, jsbsim_model);
+    const std::string jsbsim_reset = std::string(autotest_dir) +
+        "/aircraft/" + jsbsim_model + "/reset.xml";
 
-    printf("JSBSim_reset: '%s'\n", jsbsim_reset);
+    printf("JSBSim_reset: '%s'\n", jsbsim_reset.c_str());
 
     float r, p, y;
     dcm.to_euler(&r, &p, &y);
 
     if (!use_reset_template ||
-        !write_reset_from_template(jsbsim_reset_template, jsbsim_reset,
+        !write_reset_from_template(jsbsim_reset_template.c_str(), jsbsim_reset.c_str(),
                                    home.lat*1.0e-7, home.lng*1.0e-7,
                                    degrees(y))) {
-        f = fopen(jsbsim_reset, "w");
+        f = fopen(jsbsim_reset.c_str(), "w");
         if (f == nullptr) {
-            AP_HAL::panic("Unable to create jsbsim reset script %s", jsbsim_reset);
+            AP_HAL::panic("Unable to create jsbsim reset script %s", jsbsim_reset.c_str());
         }
         fprintf(f,
                 "<?xml version=\"1.0\"?>\n"
@@ -283,8 +308,6 @@ bool JSBSim::create_templates(void)
                 degrees(y));
         fclose(f);
     }
-    free(jsbsim_reset_template);
-
     created_templates = true;
     return true;
 }
