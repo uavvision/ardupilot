@@ -473,18 +473,44 @@ void Plane::calculate_forces(const struct sitl_input &input, Vector3f &rot_accel
     const bool on_launcher = have_launcher && !launcher_fired && launcher_hold_height > 0.0f;
 
     /*
-      Для -canard30 гвинт до prop_windmill_throttle не тягне, а гальмує:
-      тяга = 0, а опір вітрянки росте до 0 при досягненні порогу. Вище порогу
-      ефективний газ лінійно росте від 0 до 1, тому при 70 % тяга ~25 % від
-      повної — саме стільки потрібно для крейсеру 27–28 м/с.
+      Ефективний газ для -canard30. Лінійний перерахунок
+      (thr - 0.6)/0.4 давав на 65 % газу лише 7.6 Н, тоді як борт у рівному
+      польоті на 65 % має ~35 Н (замір балансу сил по real/00000006.BIN,
+      Step 101). Через це модель не тримала рівень у середині діапазону:
+      або повзла 23 м/с зі зниженням, або йшла на 100 % і розганялась до
+      35 м/с, і TECS гойдав швидкість.
+      Тому f(thr) — та сама таблиця, що в JSBSim-моделі canard30.xml:
+        0..55 % -> 0 (гвинт гальмує, див. prop_windmill_drag)
+        65 % -> 0.57     85 % -> 0.62     95 % -> 0.75     100 % -> 1.00
+      f(1.0) = 1.0 обов'язково: інакше ламається виміряна статична тяга
+      (180 Н = 17–20 кгс при V ≈ 0).
     */
-    float thrust = on_launcher ? 0.0f : throttle;
-    if (!on_launcher && prop_windmill_throttle > 0.25f) {
-        if (throttle <= prop_windmill_throttle) {
-            thrust = 0.0f;
-        } else {
-            thrust = (throttle - prop_windmill_throttle) / (1.0f - prop_windmill_throttle);
+    static const float thrust_curve[][2] = {
+        { 0.00f, 0.00f },
+        { 0.55f, 0.00f },
+        { 0.65f, 0.57f },
+        { 0.85f, 0.62f },
+        { 0.95f, 0.75f },
+        { 1.00f, 1.00f },
+    };
+    const float coeff_at = [&]() {
+        if (throttle <= thrust_curve[0][0]) {
+            return thrust_curve[0][1];
         }
+        for (uint8_t i = 1; i < ARRAY_SIZE(thrust_curve); i++) {
+            if (throttle <= thrust_curve[i][0]) {
+                const float t0 = thrust_curve[i-1][0], f0 = thrust_curve[i-1][1];
+                const float t1 = thrust_curve[i][0],   f1 = thrust_curve[i][1];
+                return f0 + (throttle - t0) * (f1 - f0) / (t1 - t0);
+            }
+        }
+        return thrust_curve[ARRAY_SIZE(thrust_curve)-1][1];
+    }();
+
+    float thrust = on_launcher ? 0.0f : coeff_at;
+    if (!on_launcher && prop_windmill_throttle <= 0.25f) {
+        // для старих фреймів лишаємо історичну лінійну залежність
+        thrust = throttle;
     }
 
     battery_voltage = sitl->batt_voltage - 0.7*throttle;
