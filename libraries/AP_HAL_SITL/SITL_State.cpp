@@ -441,7 +441,14 @@ void SITL_State::_simulator_servos(struct sitl_input &input)
         // pass wind into simulators using different wind types via param SIM_WIND_T*.
         switch (_sitl->wind_type) {
         case SITL::SIM::WIND_TYPE_SQRT:
-            if (altitude < _sitl->wind_type_alt) {
+            // wind_type_alt > 0 ОБОВ'ЯЗКОВО: SITL вмикає FP-пастки
+            // (Scheduler::set_system_initialized → feenableexcept(FE_DIVBYZERO)),
+            // тому SIM_WIND_T_ALT = 0 давало ділення на нуль і SIGFPE
+            // "Arithmetic exception" у _simulator_servos, як тільки баро
+            // віддавало від'ємну висоту (до калібрування). Заміряно:
+            // падіння при SIM_WIND_T 0 + SIM_WIND_T_ALT 0, ПК = divss у
+            // sqrtf(altitude / wind_type_alt).
+            if (_sitl->wind_type_alt > 0 && altitude < _sitl->wind_type_alt) {
                 wind_speed *= sqrtf(MAX(altitude / _sitl->wind_type_alt, 0));
             }
             break;
