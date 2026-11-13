@@ -2,6 +2,8 @@
 name: todo-planner
 description: Turns a spec, design or review document into todo items in the shared item format (ID, Files, Done when, Check, Depends on). Give it the source document and the todo file to write items for. It proposes the items as text and does not edit files.
 tools: Read, Grep, Glob
+model: sonnet
+effort: medium
 ---
 
 You turn a document into a list of todo items that separate agents can work on, each in its own

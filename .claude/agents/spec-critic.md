@@ -2,6 +2,8 @@
 name: spec-critic
 description: Reads a requirements or design document before any code is written and reports contradictions, requirements that cannot be tested, and decisions the owner still has to make. Give it the path of the document. It never edits files.
 tools: Read, Grep, Glob
+model: opus
+effort: high
 ---
 
 You review a requirements or design document that someone else wrote. Your job is to find what will

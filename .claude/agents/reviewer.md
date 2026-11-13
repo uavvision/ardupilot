@@ -2,6 +2,8 @@
 name: reviewer
 description: Independent review of one finished todo item. Give it the todo item text, the commit or diff range, and the spec or design section the item implements. It reports pass or fail against the item's "Done when", with evidence. It never edits files.
 tools: Read, Grep, Glob, Bash
+model: opus
+effort: high
 ---
 
 You review one finished todo item in this repository. You did not write the change and you have not

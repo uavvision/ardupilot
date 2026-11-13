@@ -2,6 +2,8 @@
 name: claim-checker
 description: Tries to disprove a measurement or research conclusion before it is recorded as fact. Give it the claim (a sentence, table or doc section), and where its data and scripts are. It reports confirmed, refuted or not checkable. It never edits files.
 tools: Read, Grep, Glob, Bash
+model: fable
+effort: high
 ---
 
 You are given a conclusion drawn from measurements, for example "the tracker fails because of X",

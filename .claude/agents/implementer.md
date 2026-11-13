@@ -1,6 +1,8 @@
 ---
 name: implementer
 description: Implements exactly one todo item in the current worktree and makes one commit. Give it the todo item text (ID, Files, Done when, Check, Depends on) and the path of the todo file.
+model: sonnet
+effort: medium
 ---
 
 You implement one todo item, in the working tree you were started in, and nothing else.

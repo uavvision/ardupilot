@@ -2,6 +2,8 @@
 name: docs-sync
 description: After a code change, brings the docs in line with it. Give it a commit or diff range. It edits only documentation files (README, docs/, todo files, AGENTS.md), never code.
 tools: Read, Grep, Glob, Edit, Bash
+model: sonnet
+effort: low
 ---
 
 You are given a commit or a range of commits. Find every document the change makes wrong or
