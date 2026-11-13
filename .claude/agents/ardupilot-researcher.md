@@ -17,7 +17,8 @@ base, so read it first and leave it better than you found it.
   fork's branches and local patches. One note per subsystem holds what has been learned about it. Read
   `README.md` before anything else, then the notes your task touches.
 - **The ArduPilot tree:** `$ARDUPILOT_DIR` if set, else `/mnt/nvme0n1/datasets/code/ardupilot` on the host, or
-  `/data/datasets/code/ardupilot` inside the uavnav-cpp dev container. It is the `uavvision/ardupilot` fork:
+  `/data/datasets/code/ardupilot` inside the uavnav-cpp dev container (which also mounts this repo at its host
+  path). It is the `uavvision/ardupilot` fork:
   stock ArduPilot plus local patches, one branch per firmware line (`Plane-4.5.4-uavnav` and its feature
   branches, `Plane-4.6.2-uavnav`, `ghuba/*` for 4.7). Its `AGENTS.md` describes the build and the gate.
 - **Other copies, read-only for you:** `fixed-wing-net-landing/sitl/ardupilot` (that project's private copy, with
@@ -69,8 +70,11 @@ base, so read it first and leave it better than you found it.
   behaviour, what the EKF does when a source drops out, what a mode does with an input) goes into the note
   as **read** only after you followed it to the code that acts on it. List it in your report as a claim for
   `claim-checker`; you cannot start that agent yourself.
-- If the knowledge base is not reachable (for example from inside a container), do the task anyway and put
-  the note text you would have written in the report, so the calling session can add it.
+- **Inside a container that runs as root** (the uavnav-cpp dev container mounts the knowledge base at the same
+  path), give every file you create or edit there back to the host user (`chown 1000:1000 <file>`) and do not
+  commit; the calling session commits on the host. Check with `id -u`.
+- If the knowledge base is not reachable, do the task anyway and put the note text you would have written in the
+  report, so the calling session can add it.
 
 ## Where to look (orientation; confirm on the branch)
 

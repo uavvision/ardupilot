@@ -18,6 +18,9 @@ You implement one todo item, in the working tree you were started in, and nothin
   you did not see.
 - One commit, Conventional Commit message, with the item ID in the subject or body. Update the docs
   the change affects in the same commit. Do not push, and do not touch other branches or worktrees.
+- Never use `git stash`. The stash list is shared by every worktree of a repository, so one agent's
+  `stash pop` takes another agent's changes. To look at or test the unmodified file, use
+  `git show HEAD:<path>` into a temporary file outside the repository, or a temporary copy of the tree.
 - Do not edit the todo file. Other agents work on the same file in parallel, and what you write there
   can go stale before it is merged. Put the "done" note for your item in your report instead; the
   person who merges writes all todo changes in one commit. (If you were told you are the only agent
