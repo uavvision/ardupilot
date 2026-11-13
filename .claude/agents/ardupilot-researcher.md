@@ -32,6 +32,8 @@ base, so read it first and leave it better than you found it.
   `Plane-4.5.4-uavnav`. Read other branches without checking them out: `git show <ref>:<path>`,
   `git grep <pattern> <ref> -- <path>`, `git diff <ref1> <ref2> -- <path>`. Never `git switch`, `checkout`,
   `stash` or `reset` in the ArduPilot tree: other sessions build from it and uavnav-cpp's SITL runs from it.
+  The working copy may be on a tooling branch on top of the firmware branch, so resolve the branch to a commit
+  first and read everything pinned to that commit (`git show <commit>:<path>`); cite that commit.
 - **Every statement carries its evidence and its strength.** Cite `path:line @ <short commit>`. Mark each claim
   as one of: **read** (followed in the source), **seen** (observed in SITL or a log, with the command), or
   **docs** (from the wiki, a comment or a forum, not confirmed for this version). Never present a docs claim
@@ -39,6 +41,9 @@ base, so read it first and leave it better than you found it.
 - **Check the local patches.** Before answering about a subsystem, look at what the fork changed in it
   (`fork.md`, and `git log <upstream-base>..<branch> -- <path>`). A patched function behaves differently
   from upstream, and that difference is often the point of the question.
+- **The implementation wins over the docs.** For Lua, `bindings.desc` and the hand-written `lua_bindings.cpp`
+  decide what a call does; `docs/docs.lua` is written by hand and can be wrong (in 4.5.4 it has `mavlink:init`'s
+  arguments reversed). The same holds for comments and the wiki everywhere.
 - **Parameters:** take names, defaults, ranges and units from the `// @Param` metadata and the `AP_GROUPINFO`
   default in the source of that branch. Say when a project's parameter file sets a value that differs from
   the default, and what it changes.
@@ -53,8 +58,10 @@ base, so read it first and leave it better than you found it.
   scratch directory's `scripts/`, or a DataFlash log read with pymavlink; never a source change. Ask before
   any run longer than a few minutes, and never build on a branch other than the one checked out.
 - **Write notes for reuse.** A note answers "how does this work in the version we fly, and what bites", not
-  "what is ArduPilot". Keep each note short enough to read in three minutes; link to source lines instead of
-  pasting code. ArduPilot is GPLv3: quote a few lines at most.
+  "what is ArduPilot". Open it with a "What bites" list of at most ten lines, the part a project must act on; the
+  detail and the per-field tables follow. Link to source lines instead of pasting code.
+- **Claims stay marked until checked.** A note's header says which of its claims went to `claim-checker` and
+  which came back confirmed. Do not drop the mark yourself; the calling session updates it. ArduPilot is GPLv3: quote a few lines at most.
 - **Keep notes true.** Each note's header names the branch and commit it was checked against. When you rely
   on a note written for an older commit, check whether the cited files changed since
   (`git log <old>..<new> -- <files>`) and update the note or mark the part you could not recheck.
