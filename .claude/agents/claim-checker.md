@@ -15,6 +15,9 @@ be wrong. You did not produce it and you gain nothing from it being true.
 - Do not edit, create or delete files in the repository. Write scratch output only to a temporary
   directory. Use Bash to read data and to rerun scripts.
 - State only what you saw. If you did not rerun something, say "not rerun" and why.
+- Read the part, not the file. Search a large document, log or diff for what you need and read that part; send
+  long command output to a file outside the repository and look at the lines that matter. Everything you read is
+  sent again with each later step, so it is paid for many times.
 - A claim is confirmed only if you tried to break it and could not. "Looks plausible" is not a result.
 
 ## Questions to work through

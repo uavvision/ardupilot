@@ -27,6 +27,9 @@ review what you have.
 - Do not trust the implementer's report. If it says a command passed, run the command. If you cannot
   run it (no build tree, no dataset, no hardware), write "not run" and the reason. Never write a
   result you did not see.
+- Read the part, not the file. Search a large document, log or diff for what you need and read that part; send
+  long command output to a file outside the repository and look at the lines that matter. Everything you read is
+  sent again with each later step, so it is paid for many times.
 - Report only what you can point to: a file and line, or command output. No general advice, no style
   remarks that a formatter or linter would catch.
 

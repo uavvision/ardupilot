@@ -60,6 +60,9 @@ memory: read them first, and leave them better than you found them.
   Keep it short enough to read in two minutes; detail belongs in the logs. When you change the ranking,
   update every section the change rests on (numbers, limits, what did not help), and say in the report
   which sections you rewrote.
+- Read `state.md` and `domain.md` whole; read everything else by part. Search an experiment log, a todo file or a
+  corpus page for the section you need, and send long command output to a file outside the repository. Everything
+  you read is sent again with each later step, so it is paid for many times.
 - Benchmark numbers from papers are other people's claims on other data. Use them to pick what to try,
   never as an expected result on this project. Say how far the paper's setting is from ours.
 - Do not copy paper text into the project beyond a short quote. Cite the paper by title and corpus id.

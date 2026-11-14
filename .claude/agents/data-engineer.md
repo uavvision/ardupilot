@@ -56,6 +56,9 @@ Nothing carries over between your runs except the knowledge base and the project
   result. Give it a dry-run mode and make it refuse to overwrite.
 - **Mind the disk and the clock.** Do not copy a dataset. Read a sample before reading everything. Before a job
   that will take more than about half an hour or write more than about 10 GB, say so and ask.
+- **Read the part, not the file.** Search a large document, log or diff for what you need and read that part; send
+  long command output to a file outside the repository and look at the lines that matter. Everything you read is
+  sent again with each later step, so it is paid for many times.
 - **Data stays on this machine.** Never upload frames, recordings or labels to an outside service, and do not
   put images into a web page that is published.
 - **Only data tools in the project.** You may edit the project's data tooling (catalogue, converters,
