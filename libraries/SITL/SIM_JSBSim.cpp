@@ -511,9 +511,10 @@ void JSBSim::send_servos(const struct sitl_input &input)
       "light"), і єдиним регулятором інтенсивності лишається severity —
       саме те, що потрібно для «штиль + справжня модель турбулентності».
     */
-    float turb_speed_fps = wind_speed_fps / 3;
-    if (input.wind.turbulence > 0.5f && turb_speed_fps < 25.0f) {
-        turb_speed_fps = 25.0f;
+    float turb_speed_fps = wind_speed_fps / 3.0f;
+    if (input.wind.turbulence > 0.5f) {
+        // Масштабуємо від SIM_WIND_TURB: 1 -> ~5 fps (~0.15..0.2 м/с), 5 -> 25 fps
+        turb_speed_fps = fmaxf(turb_speed_fps, input.wind.turbulence * 5.0f);
     }
 
     asprintf(&buf,
