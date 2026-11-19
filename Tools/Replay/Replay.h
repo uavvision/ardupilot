@@ -30,6 +30,17 @@ extern user_parameter *user_parameters;
 extern bool replay_force_ekf2;
 extern bool replay_force_ekf3;
 
+// --set-wind=T,N,E,SIGMA: call NavEKF3::setWind() every frame from replayed time T until it is accepted (only while dead reckoning)
+struct replay_set_wind_t {
+    bool enabled;
+    bool done;
+    float time_s;   // boot time of the log, as RFRH
+    float north;
+    float east;
+    float sigma;
+};
+extern replay_set_wind_t replay_set_wind;
+
 class ReplayVehicle : public AP_Vehicle {
 public:
     friend class Replay;

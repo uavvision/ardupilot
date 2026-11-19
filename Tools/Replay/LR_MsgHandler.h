@@ -131,6 +131,13 @@ public:
     void process_message(uint8_t *msg) override;
 };
 
+class LR_MsgHandler_RSW3 : public LR_MsgHandler_EKF
+{
+public:
+    using LR_MsgHandler_EKF::LR_MsgHandler_EKF;
+    void process_message(uint8_t *msg) override;
+};
+
 class LR_MsgHandler_REY3 : public LR_MsgHandler_EKF
 {
 public:

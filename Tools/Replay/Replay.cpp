@@ -39,6 +39,7 @@ static ReplayVehicle replayvehicle;
 user_parameter *user_parameters;
 bool replay_force_ekf2;
 bool replay_force_ekf3;
+replay_set_wind_t replay_set_wind;
 
 const AP_Param::Info ReplayVehicle::var_info[] = {
     GSCALAR(dummy,         "_DUMMY", 0),
@@ -135,11 +136,13 @@ void Replay::usage(void)
     ::printf("\t--param-file FILENAME  load parameters from a file\n");
     ::printf("\t--force-ekf2 force enable EKF2\n");
     ::printf("\t--force-ekf3 force enable EKF3\n");
+    ::printf("\t--set-wind=T,N,E,SIGMA call EKF3 setWind every frame from log time T (s) until accepted, wind N,E (m/s), 1-sigma SIGMA (m/s)\n");
 }
 
 enum param_key : uint8_t {
     FORCE_EKF2 = 1,
     FORCE_EKF3,
+    SET_WIND,
 };
 
 void Replay::_parse_command_line(uint8_t argc, char * const argv[])
@@ -151,6 +154,7 @@ void Replay::_parse_command_line(uint8_t argc, char * const argv[])
         {"param-file",      true,   0, 'F'},
         {"force-ekf2",      false,  0, param_key::FORCE_EKF2},
         {"force-ekf3",      false,  0, param_key::FORCE_EKF3},
+        {"set-wind",        true,   0, param_key::SET_WIND},
         {"help",            false,  0, 'h'},
         {0, false, 0, 0}
     };
@@ -185,6 +189,17 @@ void Replay::_parse_command_line(uint8_t argc, char * const argv[])
         case param_key::FORCE_EKF3:
             replay_force_ekf3 = true;
             break;
+
+        case param_key::SET_WIND: {
+            replay_set_wind_t &w = replay_set_wind;
+            if (sscanf(gopt.optarg, "%f,%f,%f,%f", &w.time_s, &w.north, &w.east, &w.sigma) != 4) {
+                ::printf("Usage: --set-wind=T,N,E,SIGMA\n");
+                exit(1);
+            }
+            w.enabled = true;
+            w.done = false;
+            break;
+        }
 
         case 'h':
         default:

@@ -38,6 +38,14 @@ void LR_MsgHandler_RFRF::process_message(uint8_t *msgbytes)
         MAP_FLAG(AP_DAL::FrameType::LogWriteEKF2, AP_DAL::FrameType::LogWriteEKF3);
     }
 #undef MAP_FLAG
+    // --set-wind: tried every frame from the requested log time until the EKF accepts it (only while dead reckoning)
+    if (replay_set_wind.enabled && !replay_set_wind.done &&
+        AP::dal().micros64() >= uint64_t(double(replay_set_wind.time_s) * 1.0e6)) {
+        if (ekf3.setWind(Vector2f(replay_set_wind.north, replay_set_wind.east), replay_set_wind.sigma)) {
+            replay_set_wind.done = true;
+            ::printf("set-wind accepted at %.3f s\n", double(AP::dal().micros64()) * 1.0e-6);
+        }
+    }
     AP::dal().handle_message(msg, ekf2, ekf3);
 }
 
@@ -163,6 +171,12 @@ void LR_MsgHandler_RWA3::process_message(uint8_t *msgbytes)
         LR_MsgHandler_RWA2 h{f, ekf2, ekf3};
         h.process_message(msgbytes);
     }
+}
+
+void LR_MsgHandler_RSW3::process_message(uint8_t *msgbytes)
+{
+    MSG_CREATE(RSW3, msgbytes);
+    ekf3.setWind(Vector2f(msg.wind_n, msg.wind_e), msg.sigma);
 }
 
 void LR_MsgHandler_REY3::process_message(uint8_t *msgbytes)
