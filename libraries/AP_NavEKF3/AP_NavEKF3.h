@@ -352,6 +352,11 @@ public:
     // Writes the default equivalent airspeed and 1-sigma uncertainty in m/s to be used in forward flight if a measured airspeed is required and not available.
     void writeDefaultAirSpeed(float airspeed, float uncertainty);
 
+    // local change (uavnav setWind): set the NE wind (m/s) and its 1-sigma uncertainty (m/s) in all cores.
+    // Returns false unless at least one core accepted it: refused when the values are not finite, no core is
+    // running, or the EKF is not dead reckoning with the wind states active (see NavEKF3_core::setWind)
+    bool setWind(const Vector2f &windNE, float sigma);
+
     // parameter conversion
     void convert_parameters();
 

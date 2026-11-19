@@ -2047,6 +2047,24 @@ void NavEKF3::writeDefaultAirSpeed(float airspeed, float uncertainty)
     }
 }
 
+// local change (uavnav setWind): allow the wind to be given from outside (forecast, launch-site measurement, operator).
+// Only accepted while dead reckoning, see NavEKF3_core::setWind(). Returns true if at least one core accepted it.
+// Only an accepted call is logged, so that Replay reproduces what the vehicle applied.
+bool NavEKF3::setWind(const Vector2f &windNE, float sigma)
+{
+    if (!core) {
+        return false;
+    }
+    bool accepted = false;
+    for (uint8_t i=0; i<num_cores; i++) {
+        accepted |= core[i].setWind(windNE, sigma);
+    }
+    if (accepted) {
+        AP::dal().log_setWind3(windNE, sigma);
+    }
+    return accepted;
+}
+
 // returns true when the yaw angle has been aligned
 bool NavEKF3::yawAlignmentComplete(void) const
 {

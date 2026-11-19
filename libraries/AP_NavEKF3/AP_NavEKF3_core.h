@@ -430,6 +430,9 @@ public:
     // Writes the default equivalent airspeed and 1-sigma uncertainty in m/s to be used in forward flight if a measured airspeed is required and not available.
     void writeDefaultAirSpeed(float airspeed, float uncertainty);
 
+    // set the wind states from outside (local change, uavnav setWind)
+    bool setWind(const Vector2f &windNE, float sigma);
+
     // request a reset the yaw to the EKF-GSF value
     void EKFGSF_requestYawReset();
 

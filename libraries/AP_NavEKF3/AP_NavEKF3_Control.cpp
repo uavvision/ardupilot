@@ -55,6 +55,54 @@ NavEKF3_core::MagCal NavEKF3_core::effective_magCal(void) const
     return MagCal(magCalParamVal);
 }
 
+// local change (uavnav setWind): set the wind states from outside. Owner's rule, as for MAV_CMD_EXTERNAL_POSITION_ESTIMATE
+// (setLatLng): accepted only while dead reckoning, when no position or velocity measurement is fused and the wind is
+// the unobserved quantity. Returns false and changes nothing otherwise, the caller retries.
+bool NavEKF3_core::setWind(const Vector2f &windNE, float sigma)
+{
+    if (!isfinite(windNE.x) || !isfinite(windNE.y) || !isfinite(sigma) || sigma <= 0) {
+        return false;
+    }
+    if (!validOrigin || PV_AidingMode == AID_NONE || inhibitWindStates ||
+        (imuSampleTime_ms - lastPosPassTime_ms) < frontend->deadReckonDeclare_ms ||
+        (imuSampleTime_ms - lastVelPassTime_ms) < frontend->deadReckonDeclare_ms ||
+        (imuSampleTime_ms - prevFlowFuseTime_ms) < frontend->deadReckonDeclare_ms ||
+        (imuSampleTime_ms - prevBodyVelFuseTime_ms) < 5000) {
+        // also refused while optical flow or body-frame odometry velocity passed fusion into the navigation
+        // filter: the velocity shift by dW would fight those measurements. Fusion times, not flowDataValid,
+        // which is true whenever flow samples arrive, also with EK3_FLOW_USE 0 or 2 (terrain only).
+        // 5000 ms is the window doingBodyVelNav uses in updateFilterStatus.
+        return false;
+    }
+    const ftype variance = constrain_ftype(sq(ftype(sigma)), WIND_VEL_VARIANCE_MIN, WIND_VEL_VARIANCE_MAX);
+
+    const Vector2F dW = Vector2F(windNE.x, windNE.y) - Vector2F(stateStruct.wind_vel.x, stateStruct.wind_vel.y);
+    stateStruct.wind_vel.x = windNE.x;
+    stateStruct.wind_vel.y = windNE.y;
+    zeroCols(P, 22, 23);
+    zeroRows(P, 22, 23);
+    P[22][22] = P[23][23] = variance;
+    windStatesAligned = true;
+
+    // ground velocity = air velocity + wind, so changing the wind alone would contradict the airspeed measurement
+    // (the test ratio jumps and the airspeed fusion pulls the wind back): shift the velocity states and the
+    // output predictor by the same change, as ResetVelocity() does. Position is not shifted.
+    stateStruct.velocity.x += dW.x;
+    stateStruct.velocity.y += dW.y;
+    for (uint8_t i=0; i<imu_buffer_length; i++) {
+        storedOutput[i].velocity.x += dW.x;
+        storedOutput[i].velocity.y += dW.y;
+    }
+    outputDataNew.velocity.x += dW.x;
+    outputDataNew.velocity.y += dW.y;
+    outputDataDelayed.velocity.x += dW.x;
+    outputDataDelayed.velocity.y += dW.y;
+    velResetNE.x = dW.x;
+    velResetNE.y = dW.y;
+    lastVelReset_ms = imuSampleTime_ms;
+    return true;
+}
+
 // Determine if learning of wind and magnetic field will be enabled and set corresponding indexing limits to
 // avoid unnecessary operations
 void NavEKF3_core::setWindMagStateLearningMode()
