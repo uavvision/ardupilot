@@ -2376,6 +2376,18 @@ void AP_AHRS::writeDefaultAirSpeed(float airspeed, float uncertainty)
 #endif
 }
 
+// local change (uavnav setWind): give the EKF3 a wind from outside. Taken under the AHRS semaphore like
+// the other calls made from the scripting thread. Returns false if EKF3 is not available or refuses it.
+bool AP_AHRS::set_wind(float north, float east, float sigma)
+{
+#if HAL_NAVEKF3_AVAILABLE
+    WITH_SEMAPHORE(_rsem);
+    return EKF3.setWind(Vector2f(north, east), sigma);
+#else
+    return false;
+#endif
+}
+
 // Write velocity data from an external navigation system
 void AP_AHRS::writeExtNavVelData(const Vector3f &vel, float err, uint32_t timeStamp_ms, uint16_t delay_ms)
 {
