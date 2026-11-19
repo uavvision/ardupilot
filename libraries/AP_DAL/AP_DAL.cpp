@@ -245,6 +245,23 @@ void AP_DAL::log_writeDefaultAirSpeed3(const float aspeed, const float uncertain
 #endif
 }
 
+// local change (uavnav setWind): log the call so Replay applies it at the same point. Limitation: nothing is
+// logged before logging starts and the write is not retried, so an early call is missing from the log
+void AP_DAL::log_setWind3(const Vector2f &windNE, const float sigma)
+{
+#if !APM_BUILD_TYPE(APM_BUILD_AP_DAL_Standalone) && !APM_BUILD_TYPE(APM_BUILD_Replay)
+    // finish the frame in progress so that RSW3 is written after its RFRF, as for the other event records:
+    // the call came after the EKF update of this frame, Replay must apply it after that update too
+    end_frame();
+    struct log_RSW3 pkt{
+        wind_n:        windNE.x,
+        wind_e:        windNE.y,
+        sigma:         sigma,
+    };
+    WRITE_REPLAY_BLOCK(RSW3, pkt);
+#endif
+}
+
 void AP_DAL::log_writeEulerYawAngle(float yawAngle, float yawAngleErr, uint32_t timeStamp_ms, uint8_t type)
 {
 #if !APM_BUILD_TYPE(APM_BUILD_AP_DAL_Standalone) && !APM_BUILD_TYPE(APM_BUILD_Replay)

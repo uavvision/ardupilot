@@ -85,6 +85,8 @@ public:
     void log_SetLatLng(const Location &loc, float posAccuracy, uint32_t timestamp_ms);
 
     void log_writeDefaultAirSpeed3(const float aspeed, const float uncertainty);
+    // local change (uavnav setWind)
+    void log_setWind3(const Vector2f &windNE, const float sigma);
     void log_writeEulerYawAngle(float yawAngle, float yawAngleErr, uint32_t timeStamp_ms, uint8_t type);
 
     enum class StateMask {

@@ -38,7 +38,8 @@
     LOG_RSLL_MSG, \
     LOG_REVH_MSG, \
     LOG_RWOH_MSG, \
-    LOG_RBOH_MSG
+    LOG_RBOH_MSG, \
+    LOG_RSW3_MSG
 
 // Replay Data Structures
 struct log_RFRH {
@@ -119,6 +120,15 @@ struct log_RSO2 {
 struct log_RWA2 {
     float airspeed;
     float uncertainty;
+    uint8_t _end;
+};
+
+// @LoggerMessage: RSW3
+// @Description: Replay set-wind event (local change, uavnav setWind)
+struct log_RSW3 {
+    float wind_n;
+    float wind_e;
+    float sigma;
     uint8_t _end;
 };
 
@@ -435,4 +445,6 @@ struct log_RBOH {
     { LOG_RWOH_MSG, RLOG_SIZE(RWOH),                                   \
       "RWOH", "ffIffff", "DA,DT,TS,PX,PY,PZ,R", "-------", "-------" }, \
     { LOG_RBOH_MSG, RLOG_SIZE(RBOH),                                   \
-      "RBOH", "ffffffffIfffH", "Q,DPX,DPY,DPZ,DAX,DAY,DAZ,DT,TS,OX,OY,OZ,D", "-------------", "-------------" },
+      "RBOH", "ffffffffIfffH", "Q,DPX,DPY,DPZ,DAX,DAY,DAZ,DT,TS,OX,OY,OZ,D", "-------------", "-------------" }, \
+    { LOG_RSW3_MSG, RLOG_SIZE(RSW3),                                   \
+      "RSW3", "fff", "WN,WE,Sigma", "nnn", "000" },
