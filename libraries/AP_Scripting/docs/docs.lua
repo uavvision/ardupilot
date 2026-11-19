@@ -3144,6 +3144,23 @@ function ahrs:groundspeed_vector() end
 ---@return Vector3f_ud
 function ahrs:wind_estimate() end
 
+-- Local change: give EKF3 a wind from outside (forecast, launch-site measurement, operator).
+-- Accepted only while the EKF is dead reckoning (no GPS, external nav or optical flow position or
+-- velocity fused for about 1 s, no odometry velocity fused for 5 s) and the wind states are active
+-- (in flight), like MAV_CMD_EXTERNAL_POSITION_ESTIMATE; otherwise nothing changes and false is
+-- returned, the caller retries. When accepted the ground velocity is shifted by the wind change so
+-- the airspeed fusion stays consistent. Call it in steady flight, not during a launch. The
+-- airspeed fusion keeps adjusting the wind; to keep it close to the given value while dead
+-- reckoning, set EK3_WIND_P_NSE 0.01 and EK3_WIND_PSCALE 0 from the script (restore them when
+-- GPS returns) and use sigma 0.5.
+-- A call made before logging starts is not in the log, so Replay will differ unless
+-- LOG_DISARMED is set.
+---@param north number -- north wind component in m/s
+---@param east number -- east wind component in m/s
+---@param sigma number -- 1-sigma uncertainty in m/s, 0.5 to 20 (EKF3 limits the variance to at least 0.25)
+---@return boolean -- true if at least one EKF3 core accepted the wind
+function ahrs:set_wind(north, east, sigma) end
+
 -- Determine how aligned heading_deg is with the wind. Return result
 -- is 1.0 when perfectly aligned heading into wind, -1 when perfectly
 -- aligned with-wind, and zero when perfect cross-wind. There is no
