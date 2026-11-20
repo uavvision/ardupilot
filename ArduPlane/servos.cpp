@@ -571,10 +571,13 @@ void Plane::set_throttle(void)
         } else if (landing.is_flaring() && landing.use_thr_min_during_flare() ) {
             // throttle is suppressed (above) to zero in final flare in auto mode, but we allow instead thr_min if user prefers, eg turbines:
             SRV_Channels::set_output_scaled(SRV_Channel::k_throttle, aparm.throttle_min.get());
-        } else if ((flight_stage == AP_FixedWing::FlightStage::TAKEOFF)
-                    && (aparm.takeoff_throttle_idle.get() > 0)
-                  ) {
-            // we want to spin at idle throttle before the takeoff conditions are met
+        } else if ((aparm.takeoff_throttle_idle.get() > 0) &&
+                   ((flight_stage == AP_FixedWing::FlightStage::TAKEOFF) ||
+                    (control_mode == &mode_auto && !auto_state.takeoff_complete))) {
+            // uavnav local: spin at idle throttle before the takeoff conditions are met.
+            // TAKEOFF mode sets the TAKEOFF flight stage on arming, but AUTO keeps the stage
+            // NORMAL while the throttle is suppressed (update_flight_stage), so in AUTO a
+            // pending NAV_TAKEOFF (takeoff_complete false, set only by do_takeoff) counts too.
             SRV_Channels::set_output_scaled(SRV_Channel::k_throttle, aparm.takeoff_throttle_idle.get());
         } else {
             // default

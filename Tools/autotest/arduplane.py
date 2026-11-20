@@ -5290,6 +5290,323 @@ class AutoTestPlane(vehicle_test_suite.TestSuite):
             self.set_current_waypoint(2)
         self.fly_home_land_and_disarm()
 
+    # ---------------------------------------------------------------------------------------------
+    # uavnav local patches (Plane-4.5.4-uavnav). Each test names the local commit it covers.
+    # ---------------------------------------------------------------------------------------------
+
+    class MavGPSFeeder(object):
+        '''Sends GPS_INPUT for one MAVLink GPS instance (GPS_TYPE 14) from a
+        message hook, at rate_hz of sim time.  With fixed set, the position
+        is that fixed point and the velocity is flagged as absent; without it,
+        position and velocity are the simulator's truth (SIM_STATE).  It is
+        clocked by SIM_STATE, so that has to stream faster than rate_hz: AP_GPS
+        calls the GPS unhealthy when the mean gap passes 245 ms.'''
+
+        def __init__(self, test, gps_id, rate_hz=10, sats=10):
+            self.test = test
+            self.gps_id = gps_id
+            self.period = 1.0 / rate_hz
+            self.sats = sats
+            self.fixed = None      # (lat_int, lon_int, alt_m), or None for truth
+            self.enabled = True
+            self.last_sent = None
+            self.sent = 0
+
+        def hook(self, mav, m):
+            if not self.enabled or m.get_type() != 'SIM_STATE':
+                return
+            st = mav.messages.get('SYSTEM_TIME', None)
+            if st is None:
+                return
+            now = st.time_boot_ms * 1.0e-3
+            if self.last_sent is not None and self.last_sent <= now < self.last_sent + 0.9 * self.period:
+                return
+            self.last_sent = now
+            ignore = (mavutil.mavlink.GPS_INPUT_IGNORE_FLAG_VDOP |
+                      mavutil.mavlink.GPS_INPUT_IGNORE_FLAG_VERTICAL_ACCURACY)
+            if self.fixed is not None:
+                (lat, lon, alt) = self.fixed
+                (vn, ve, vd) = (0, 0, 0)
+                ignore |= (mavutil.mavlink.GPS_INPUT_IGNORE_FLAG_VEL_HORIZ |
+                           mavutil.mavlink.GPS_INPUT_IGNORE_FLAG_VEL_VERT |
+                           mavutil.mavlink.GPS_INPUT_IGNORE_FLAG_SPEED_ACCURACY)
+            else:
+                (lat, lon, alt) = (m.lat_int, m.lon_int, m.alt)
+                (vn, ve, vd) = (m.vn, m.ve, m.vd)
+            time_week_ms = int(now * 1000) % (7 * 86400 * 1000)
+            mav.mav.gps_input_send(
+                0,                # time_usec
+                self.gps_id,
+                ignore,
+                time_week_ms,
+                2300,             # time_week
+                3,                # fix_type: 3D
+                lat,
+                lon,
+                alt,
+                0.7,              # hdop
+                1.0,              # vdop
+                vn,
+                ve,
+                vd,
+                0.3,              # speed_accuracy
+                0.5,              # horiz_accuracy
+                1.0,              # vert_accuracy
+                self.sats,
+            )
+            self.sent += 1
+
+    def offset_latlon_int(self, lat_int, lon_int, north, east):
+        '''returns (lat_int, lon_int) moved north and east by metres'''
+        loc = mavutil.location(lat_int * 1.0e-7, lon_int * 1.0e-7, 0, 0)
+        self.location_offset_ne(loc, north, east)
+        return (int(loc.lat * 1.0e7), int(loc.lng * 1.0e7))
+
+    def hold_servo_in_range(self, channel, pwm_min, pwm_max, hold, timeout=10):
+        '''waits for SERVOn within [pwm_min, pwm_max], then requires it to
+        stay there for hold seconds of sim time'''
+        field = "servo%u_raw" % channel
+        tstart = self.get_sim_time()
+        in_range_since = None
+        value = None
+        while True:
+            now = self.get_sim_time_cached()
+            if now - tstart > timeout:
+                raise NotAchievedException("%s did not hold in [%u, %u] for %.0fs (last %s)" %
+                                           (field, pwm_min, pwm_max, hold, value))
+            m = self.assert_receive_message('SERVO_OUTPUT_RAW', timeout=2)
+            value = getattr(m, field)
+            if pwm_min <= value <= pwm_max:
+                if in_range_since is None:
+                    self.progress("%s=%u in [%u, %u]" % (field, value, pwm_min, pwm_max))
+                    in_range_since = now
+                if now - in_range_since >= hold:
+                    return value
+            else:
+                if in_range_since is not None:
+                    raise NotAchievedException("%s=%u left [%u, %u]" %
+                                               (field, value, pwm_min, pwm_max))
+
+    def stream_sim_state(self):
+        '''SIM_STATE (truth, and the GPS_INPUT feeders' clock) is not streamed
+        by default; ask for it.  Needed again after every reboot.'''
+        self.set_message_rate_hz('SIM_STATE', 25)
+
+    def truth_altitude_above(self, ground_alt):
+        '''simulator altitude in metres above ground_alt (AMSL metres)'''
+        return self.assert_receive_message('SIM_STATE', timeout=2).alt - ground_alt
+
+    def takeoff_idle_then_launch(self, idle_pct):
+        '''armed and waiting for the launch (TKOFF_THR_MINACC set): checks
+        throttle at minimum with TKOFF_THR_IDLE 0, at idle_pct with it set,
+        that the plane stays on the ground, then releases the launch and
+        checks it climbs to TKOFF_ALT'''
+        ground_alt = self.assert_receive_message('SIM_STATE').alt
+
+        self.start_subtest("TKOFF_THR_IDLE=0: throttle stays at minimum while waiting for the launch")
+        self.hold_servo_in_range(3, 1000, 1005, hold=3)
+
+        self.start_subtest("TKOFF_THR_IDLE=%u: throttle at idle while waiting for the launch" % idle_pct)
+        self.set_parameter("TKOFF_THR_IDLE", idle_pct)
+        idle_pwm = 1000 + 10 * idle_pct
+        self.hold_servo_in_range(3, idle_pwm - 10, idle_pwm + 10, hold=5)
+        rise = self.truth_altitude_above(ground_alt)
+        if rise > 1:
+            raise NotAchievedException("left the ground at idle (%.1f m)" % rise)
+
+        self.start_subtest("launch: throttle leaves idle and the plane climbs to TKOFF_ALT")
+        self.set_parameter("TKOFF_THR_MINACC", 0)
+        self.wait_servo_channel_value(3, 1900, comparator=operator.ge, timeout=5)
+        self.wait_altitude(45, 55, relative=True, timeout=60)
+
+    def TakeoffIdle(self):
+        '''TKOFF_THR_IDLE in TAKEOFF mode: idle throttle after arming, before the launch (local fc8c1a409b)'''
+        self.set_parameters({
+            "TKOFF_ALT": 50,
+            "TKOFF_THR_MINACC": 15,     # no such acceleration on the runway: the launch waits
+            "TKOFF_THR_IDLE": 0,
+        })
+        self.stream_sim_state()
+        self.change_mode('TAKEOFF')
+        self.wait_ready_to_arm()
+        self.arm_vehicle()
+        self.takeoff_idle_then_launch(20)
+        self.disarm_vehicle(force=True)
+        self.reboot_sitl()
+
+    def TakeoffIdleAUTO(self):
+        '''TKOFF_THR_IDLE in AUTO at NAV_TAKEOFF: idle throttle after arming, before the launch (local fc8c1a409b)'''
+        self.upload_simple_relhome_mission([
+            (mavutil.mavlink.MAV_CMD_NAV_TAKEOFF, 0, 0, 50),
+            (mavutil.mavlink.MAV_CMD_NAV_WAYPOINT, 800, 0, 50),
+            (mavutil.mavlink.MAV_CMD_NAV_LOITER_UNLIM, 800, 0, 50),
+        ])
+        self.set_parameters({
+            "TKOFF_THR_MINACC": 15,
+            "TKOFF_THR_IDLE": 0,
+        })
+        self.stream_sim_state()
+        self.change_mode('AUTO')
+        self.wait_ready_to_arm()
+        self.arm_vehicle()
+        self.takeoff_idle_then_launch(20)
+        self.disarm_vehicle(force=True)
+        self.reboot_sitl()
+
+    def TakeoffNoGPSVelocity(self):
+        '''take off in TAKEOFF mode while the MAVLink GPS gives only a fixed set point and no velocity until the plane is in the air (local 7f7385fbb8)'''  # noqa
+        self.context_push()
+        ex = None
+        try:
+            self.stream_sim_state()
+            start = self.assert_receive_message('SIM_STATE')
+            ground_alt = start.alt
+            feeder = AutoTestPlane.MavGPSFeeder(self, 0)
+            feeder.fixed = (start.lat_int, start.lon_int, start.alt)
+            self.install_message_hook_context(feeder.hook)
+            self.set_parameters({
+                "GPS_TYPE": 14,         # MAVLink
+                "SIM_GPS_DISABLE": 1,
+                "TKOFF_ALT": 50,
+            })
+            self.reboot_sitl()
+            self.stream_sim_state()
+            self.change_mode('TAKEOFF')
+            self.wait_ready_to_arm()
+            self.arm_vehicle()
+
+            self.start_subtest("set point, no velocity: throttle released and the plane leaves the ground")
+            tstart = self.get_sim_time()
+            max_thr = 0
+            max_gps_vel = 0
+            while True:
+                if self.get_sim_time_cached() - tstart > 60:
+                    raise NotAchievedException("not in the air after 60s (max throttle %u)" % max_thr)
+                m = self.mav.recv_match(type=['SIM_STATE', 'SERVO_OUTPUT_RAW', 'GPS_RAW_INT'],
+                                        blocking=True, timeout=2)
+                if m is None:
+                    continue
+                t = m.get_type()
+                if t == 'SERVO_OUTPUT_RAW':
+                    max_thr = max(max_thr, m.servo3_raw)
+                elif t == 'GPS_RAW_INT':
+                    max_gps_vel = max(max_gps_vel, m.vel)
+                    if (m.lat, m.lon) != (start.lat_int, start.lon_int):
+                        raise NotAchievedException("GPS_RAW_INT is not the set point")
+                elif m.alt - ground_alt > 5:
+                    self.progress("in the air: %.1f m truth, %.1f m/s truth ground speed, max throttle %u, max GPS vel %u cm/s" %  # noqa
+                                  (m.alt - ground_alt, math.hypot(m.vn, m.ve), max_thr, max_gps_vel))
+                    break
+            if max_thr < 1800:
+                raise NotAchievedException("throttle not released (max %u)" % max_thr)
+            if max_gps_vel != 0:
+                raise NotAchievedException("GPS reported velocity %u cm/s; the test is wrong" % max_gps_vel)
+
+            self.start_subtest("GPS from the simulator once in the air: climb to TKOFF_ALT")
+            feeder.fixed = None
+            self.wait_altitude(45, 55, relative=True, timeout=60)
+            truth = self.truth_altitude_above(ground_alt)
+            if abs(truth - 50) > 10:
+                raise NotAchievedException("truth altitude %.1f m, want 50" % truth)
+
+            self.start_subtest("estimate agrees with truth after 10s of flight")
+            self.delay_sim_time(10)
+            gpi = self.assert_receive_message('GLOBAL_POSITION_INT')
+            ss = self.assert_receive_message('SIM_STATE')
+            error = self.get_distance_int(gpi, mavutil.location(ss.lat_int, ss.lon_int, 0, 0))
+            self.progress("estimate - truth: %.1f m" % error)
+            if error > 25:
+                raise NotAchievedException("position estimate %.1f m from truth" % error)
+            self.disarm_vehicle(force=True)
+        except Exception as e:
+            self.print_exception_caught(e)
+            ex = e
+        self.context_pop()
+        self.disarm_vehicle(force=True)
+        self.reboot_sitl()
+        if ex is not None:
+            raise ex
+
+    def MavGPSTwoInstances(self):
+        '''GPS_INPUT gps_id 0 reaches GPS_RAW_INT and gps_id 1 reaches GPS2_RAW (local dbcb15435a, 2f22de52d1)'''
+        self.context_push()
+        ex = None
+        try:
+            self.stream_sim_state()
+            start = self.assert_receive_message('SIM_STATE')
+            a_lat, a_lon = start.lat_int, start.lon_int
+            b_lat, b_lon = self.offset_latlon_int(a_lat, a_lon, 200, 100)
+            c_lat, c_lon = self.offset_latlon_int(a_lat, a_lon, -300, 400)
+            a_alt = start.alt
+            b_alt = start.alt + 30
+            feeder0 = AutoTestPlane.MavGPSFeeder(self, 0, sats=10)
+            feeder0.fixed = (a_lat, a_lon, a_alt)
+            feeder1 = AutoTestPlane.MavGPSFeeder(self, 1, sats=15)
+            feeder1.fixed = (b_lat, b_lon, b_alt)
+            feeder2 = AutoTestPlane.MavGPSFeeder(self, 2, sats=20)  # no such receiver
+            feeder2.fixed = (c_lat, c_lon, start.alt)
+            for f in feeder0, feeder1, feeder2:
+                self.install_message_hook_context(f.hook)
+            self.set_parameters({
+                "GPS_TYPE": 14,
+                "GPS_TYPE2": 14,
+                "SIM_GPS_DISABLE": 1,
+            })
+            self.reboot_sitl(check_position=False)
+            self.stream_sim_state()
+
+            self.start_subtest("gps_id 0 -> GPS_RAW_INT")
+            self.wait_message_field_values('GPS_RAW_INT', {
+                "fix_type": 3,
+                "lat": a_lat,
+                "lon": a_lon,
+                "satellites_visible": 10,
+            }, timeout=30)
+            m = self.assert_receive_message('GPS_RAW_INT')
+            if abs(m.alt - a_alt * 1000) > 20:
+                raise NotAchievedException("GPS_RAW_INT.alt %d mm, want %d" % (m.alt, a_alt * 1000))
+
+            self.start_subtest("gps_id 1 -> GPS2_RAW")
+            self.wait_message_field_values('GPS2_RAW', {
+                "fix_type": 3,
+                "lat": b_lat,
+                "lon": b_lon,
+                "satellites_visible": 15,
+            }, timeout=30)
+            m = self.assert_receive_message('GPS2_RAW')
+            if abs(m.alt - b_alt * 1000) > 20:
+                raise NotAchievedException("GPS2_RAW.alt %d mm, want %d" % (m.alt, b_alt * 1000))
+            if feeder2.sent == 0:
+                raise NotAchievedException("gps_id 2 was never sent; the test is wrong")
+
+            self.start_subtest("gps_id 1 stops: GPS2_RAW loses its fix, GPS_RAW_INT keeps gps_id 0")
+            feeder1.enabled = False
+            tstart = self.get_sim_time()
+            while self.assert_receive_message('GPS2_RAW').fix_type >= 3:
+                if self.get_sim_time_cached() - tstart > 15:
+                    raise NotAchievedException("GPS2_RAW kept its fix without gps_id 1")
+            self.assert_message_field_values(self.assert_receive_message('GPS_RAW_INT'), {
+                "fix_type": 3,
+                "lat": a_lat,
+                "lon": a_lon,
+                "satellites_visible": 10,
+            })
+
+            self.start_subtest("gps_id 1 resumes: GPS2_RAW gets it back")
+            feeder1.enabled = True
+            self.wait_message_field_values('GPS2_RAW', {
+                "fix_type": 3,
+                "lat": b_lat,
+                "lon": b_lon,
+            }, timeout=15)
+        except Exception as e:
+            self.print_exception_caught(e)
+            ex = e
+        self.context_pop()
+        self.reboot_sitl(check_position=False)
+        if ex is not None:
+            raise ex
+
     def location_from_ADSB_VEHICLE(self, m):
         '''return a mavutil.location extracted from an ADSB_VEHICLE mavlink
         message'''
@@ -5425,6 +5742,10 @@ class AutoTestPlane(vehicle_test_suite.TestSuite):
             self.TerrainRally,
             self.MAV_CMD_NAV_LOITER_UNLIM,
             self.MAV_CMD_NAV_RETURN_TO_LAUNCH,
+            self.TakeoffIdle,
+            self.TakeoffIdleAUTO,
+            self.TakeoffNoGPSVelocity,
+            self.MavGPSTwoInstances,
         ])
         return ret
 
