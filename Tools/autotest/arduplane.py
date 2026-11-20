@@ -5607,6 +5607,160 @@ class AutoTestPlane(vehicle_test_suite.TestSuite):
         if ex is not None:
             raise ex
 
+    # ---- setwind (Plane-4.5.4-uavnav-setwind) ---------------------------------------------------
+
+    def wind_ne(self):
+        '''AHRS wind estimate from the WIND message as (north, east) m/s, the
+        direction the air moves TO (WIND.direction is where it comes FROM)'''
+        m = self.assert_receive_message('WIND')
+        d = math.radians(m.direction)
+        return (-m.speed * math.cos(d), -m.speed * math.sin(d))
+
+    def assert_wind_ne(self, north, east, tolerance):
+        (wn, we) = self.wind_ne()
+        self.progress("wind N %.1f E %.1f, want N %.1f E %.1f (+-%.1f)" % (wn, we, north, east, tolerance))
+        if abs(wn - north) > tolerance or abs(we - east) > tolerance:
+            raise NotAchievedException("wind N %.1f E %.1f, want N %.1f E %.1f" % (wn, we, north, east))
+
+    def ekf_truth_error(self):
+        '''horizontal distance of the EKF position from the simulator's, metres'''
+        gpi = self.assert_receive_message('GLOBAL_POSITION_INT')
+        ss = self.assert_receive_message('SIM_STATE')
+        return self.get_distance_int(gpi, mavutil.location(ss.lat_int, ss.lon_int, 0, 0))
+
+    def ekf_minus_truth_ve(self):
+        '''EKF east ground velocity minus the simulator's, m/s'''
+        gpi = self.assert_receive_message('GLOBAL_POSITION_INT')
+        ss = self.assert_receive_message('SIM_STATE')
+        return gpi.vy * 0.01 - ss.ve
+
+    def SetWindEKF3(self):
+        '''ahrs:set_wind: EKF3 takes a wind only while dead reckoning, and shifts its ground velocity with it (local setwind 8e8a0955b4)'''  # noqa
+        self.set_parameters({
+            "SCR_ENABLE": 1,
+            "SCR_USER1": 0,
+        })
+        self.install_test_script_context("set_wind_test.lua")
+        self.context_collect('STATUSTEXT')
+        self.reboot_sitl()
+        self.stream_sim_state()
+        self.wait_statustext("SETWIND ready", check_context=True)
+
+        def set_wind(n, north, east, sigma, want):
+            self.set_parameters({"SCR_USER2": north, "SCR_USER3": east, "SCR_USER4": sigma})
+            self.set_parameter("SCR_USER1", n)
+            m = self.wait_statustext("SETWIND %u (accepted|refused|error)" % n, regex=True, check_context=True)
+            got = m.text.split()[-1]
+            if got != want:
+                raise NotAchievedException("set_wind(%.1f, %.1f, %.1f): %s, want %s" % (north, east, sigma, got, want))
+
+        self.start_subtest("on the ground with GPS: refused")
+        self.wait_ready_to_arm()
+        set_wind(1, 0, 8, 0.5, "refused")
+
+        self.start_subtest("flying with GPS: refused")
+        self.takeoff(80, mode='TAKEOFF')
+        self.change_mode('LOITER')
+        self.delay_sim_time(10)
+        set_wind(2, 0, 8, 0.5, "refused")
+
+        self.start_subtest("GPS lost, dead reckoning: accepted; wind and ground velocity move by the same step")
+        self.set_parameter("SIM_GPS_DISABLE", 1)
+        self.delay_sim_time(5)
+        (wn0, we0) = self.wind_ne()
+        dv0 = self.ekf_minus_truth_ve()
+        set_wind(3, 0, 8, 0.5, "accepted")
+        self.assert_wind_ne(0, 8, 1.0)
+        dv1 = self.ekf_minus_truth_ve()
+        self.progress("EKF - truth east velocity: %.1f before, %.1f after; wind east was %.1f" % (dv0, dv1, we0))
+        if abs((dv1 - dv0) - (8 - we0)) > 2:
+            raise NotAchievedException("ground velocity step %.1f, want %.1f" % (dv1 - dv0, 8 - we0))
+
+        self.start_subtest("arguments outside the binding's ranges: Lua error (sigma 0, wind 150 m/s)")
+        set_wind(4, 0, 4, 0, "error")
+        set_wind(5, 0, 150, 0.5, "error")
+        self.assert_wind_ne(0, 8, 1.0)
+
+        self.start_subtest("GPS back: refused")
+        self.set_parameter("SIM_GPS_DISABLE", 0)
+        self.delay_sim_time(15)
+        set_wind(6, 0, 8, 0.5, "refused")
+
+        self.disarm_vehicle(force=True)
+        self.reboot_sitl()
+
+    def WindOnGPSLoss(self):
+        '''wind_on_gps_loss.lua applet: forecast wind given and held while dead reckoning, released when GPS returns (local setwind be528bf9ef)'''  # noqa
+        self.set_parameters({
+            "SCR_ENABLE": 1,
+            "SIM_WIND_SPD": 8,
+            "SIM_WIND_DIR": 270,    # from the west: the air moves east at 8 m/s
+            "SIM_WIND_TURB": 0,
+            "LOG_REPLAY": 1,        # so the accepted wind is logged as RSW3 for Replay
+            "LOG_DISARMED": 1,
+        })
+        self.install_applet_script_context("wind_on_gps_loss.lua")
+        self.context_collect('STATUSTEXT')
+        self.reboot_sitl()
+        self.set_parameters({
+            "SWND_SRC": 0,          # the wind set before flight
+            "SWND_SPD": 8,
+            "SWND_DIR": 270,
+        })
+        self.stream_sim_state()
+        self.wait_statustext(r"\[SWND\] Wind on GPS loss", regex=True, check_context=True)
+        nse = self.get_parameter("EK3_WIND_P_NSE")
+        pscale = self.get_parameter("EK3_WIND_PSCALE")
+
+        self.wait_ready_to_arm()
+        self.takeoff(100, mode='TAKEOFF', timeout=120)
+        self.change_mode('LOITER')     # the applet waits for steady flight; TAKEOFF mode is not
+        self.delay_sim_time(25)        # SWND_DELAY 20 s of flight
+
+        self.start_subtest("GPS lost: the forecast wind is given and held")
+        self.set_parameter("SIM_GPS_DISABLE", 1)
+        self.wait_statustext(r"\[SWND\] wind set N -?0\.0 E 8\.0", regex=True, check_context=True, timeout=30)
+        self.assert_wind_ne(0, 8, 1.0)
+        self.assert_parameter_value("EK3_WIND_P_NSE", 0.01, epsilon=1e-6)
+        self.assert_parameter_value("EK3_WIND_PSCALE", 0, epsilon=1e-6)
+
+        self.start_subtest("120 s dead reckoning: wind still held, position close to truth")
+        tstart = self.get_sim_time()
+        max_error = 0
+        while self.get_sim_time_cached() - tstart < 120:
+            max_error = max(max_error, self.ekf_truth_error())
+            self.delay_sim_time(5)
+        self.progress("max EKF - truth over 120 s without GPS: %.0f m" % max_error)
+        self.assert_wind_ne(0, 8, 1.5)
+        if max_error > 150:
+            raise NotAchievedException("EKF %.0f m from truth without GPS" % max_error)
+
+        self.start_subtest("GPS back: EK3_WIND_P_NSE and EK3_WIND_PSCALE restored")
+        self.set_parameter("SIM_GPS_DISABLE", 0)
+        self.wait_statustext(r"\[SWND\] GPS back, wind params restored", regex=True, check_context=True,
+                             timeout=60)
+        self.assert_parameter_value("EK3_WIND_P_NSE", nse, epsilon=1e-6)
+        self.assert_parameter_value("EK3_WIND_PSCALE", pscale, epsilon=1e-6)
+
+        self.start_subtest("the accepted wind is in the log as RSW3 (Replay applies it from there)")
+        dfreader = self.dfreader_for_current_onboard_log()
+        rsw3 = []
+        while True:
+            m = dfreader.recv_match(type=['RSW3', 'SWND'])
+            if m is None:
+                break
+            rsw3.append(m)
+            self.progress("%s" % str(m))
+        rsw3_only = [m for m in rsw3 if m.get_type() == 'RSW3']
+        if len(rsw3_only) != 1:
+            raise NotAchievedException("want one RSW3, got %u" % len(rsw3_only))
+        m = rsw3_only[0]
+        if abs(m.WN) > 0.1 or abs(m.WE - 8) > 0.1 or abs(m.Sigma - 0.5) > 0.01:
+            raise NotAchievedException("RSW3 %s, want WN 0 WE 8 Sigma 0.5" % str(m))
+
+        self.disarm_vehicle(force=True)
+        self.reboot_sitl()
+
     def location_from_ADSB_VEHICLE(self, m):
         '''return a mavutil.location extracted from an ADSB_VEHICLE mavlink
         message'''
@@ -5746,6 +5900,8 @@ class AutoTestPlane(vehicle_test_suite.TestSuite):
             self.TakeoffIdleAUTO,
             self.TakeoffNoGPSVelocity,
             self.MavGPSTwoInstances,
+            self.SetWindEKF3,
+            self.WindOnGPSLoss,
         ])
         return ret
 
