@@ -1,182 +1,188 @@
-# Wind on GPS loss
+# Вітер при втраті GPS
 
-`wind_on_gps_loss.lua` gives EKF3 a wind when the GPS is lost and keeps it while the EKF dead reckons. Without
-it the EKF learns the wind slowly, or not at all in a GPS-denied flight (svitlich flight: it held about 2 m/s
-while the real wind was about 8 m/s, and the aircraft ended 8.2 km from the landing site).
+`wind_on_gps_loss.lua` задає EKF3 вітер, коли GPS втрачено, і утримує його, поки EKF веде рахунок шляху (dead
+reckoning). Без нього EKF вчить вітер повільно, а в польоті без GPS не вчить зовсім (політ svitlich: EKF тримав
+близько 2 м/с при реальному вітрі близько 8 м/с, і літак закінчив політ за 8,2 км від місця посадки).
 
-## Needs
+## Що потрібно
 
-The firmware patch `ahrs:set_wind(north, east, sigma)` (branch `Plane-4.5.4-uavnav-setwind`: `NavEKF3::setWind`,
-`AP_AHRS::set_wind`, Lua binding, Replay record RSW3). Without it the script prints an error and stops.
-EKF3 accepts the wind only while dead reckoning (no GPS, external nav or optical flow fused for about 1 s, no
-odometry for 5 s) and with the wind states active (in flight). The script therefore keeps offering the wind in
-steady flight; the first accepted call marks the start of dead reckoning.
+Патч прошивки `ahrs:set_wind(north, east, sigma)` (гілка `Plane-4.5.4-uavnav-setwind`: `NavEKF3::setWind`,
+`AP_AHRS::set_wind`, Lua-прив'язка, запис RSW3 для Replay). Без нього скрипт виводить помилку і зупиняється.
+EKF3 приймає вітер лише під час рахунку шляху (близько 1 с без GPS, зовнішньої навігації чи оптичного потоку,
+5 с без одометрії) і коли стани вітру активні (у польоті). Тому скрипт пропонує вітер повторно в усталеному
+польоті; перший прийнятий виклик позначає початок рахунку шляху.
 
-## Setting up the aircraft (once)
+## Налаштування літака (один раз)
 
-1. Flash ArduPlane built from `Plane-4.5.4-uavnav-setwind`.
-2. Set `SCR_ENABLE` 1 and reboot.
-3. Copy `wind_on_gps_loss.lua` to `APM/scripts/` on the SD card (in SITL: `scripts/` in the directory SITL runs
-   in) and reboot. At boot the GCS shows `[SWND] Wind on GPS loss, version ...` and the `SWND_` parameters
-   appear. `[SWND] firmware has no ahrs:set_wind, script stopped` means the firmware is not from this branch.
-4. For Replay of the flight, set `LOG_REPLAY` 1 and `LOG_DISARMED` 1. The accepted wind is then logged as
-   `RSW3`, and Replay applies it at the same EKF frame. A wind accepted before logging starts is not logged.
-5. Choose the wind source, `SWND_SRC`. 1 (auto) uses the wind the EKF learned from GPS if it had at least
-   `SWND_GPS_S` seconds of GPS in flight, otherwise the forecast; 0 always uses the forecast.
-6. Leave `EK3_WIND_P_NSE` and `EK3_WIND_PSCALE` at the aircraft's normal values. The script changes them in RAM
-   only while it holds the wind.
+1. Прошити ArduPlane, зібраний з `Plane-4.5.4-uavnav-setwind`.
+2. Встановити `SCR_ENABLE` 1 і перезавантажити.
+3. Скопіювати `wind_on_gps_loss.lua` у `APM/scripts/` на SD-карті (у SITL: `scripts/` у каталозі, з якого
+   запущено SITL) і перезавантажити. Під час завантаження наземна станція показує
+   `[SWND] Wind on GPS loss, version ...`, і з'являються параметри `SWND_`. Повідомлення
+   `[SWND] firmware has no ahrs:set_wind, script stopped` означає, що прошивка не з цієї гілки.
+4. Щоб відтворити політ у Replay, встановити `LOG_REPLAY` 1 і `LOG_DISARMED` 1. Тоді прийнятий вітер пишеться в
+   лог як `RSW3`, і Replay застосовує його на тому самому кадрі EKF. Вітер, прийнятий до початку запису лога, у лог
+   не потрапляє.
+5. Вибрати джерело вітру, `SWND_SRC`. 1 (авто) бере вітер, який EKF вивчив за GPS, якщо GPS був у польоті щонайменше
+   `SWND_GPS_S` секунд, інакше прогноз; 0 завжди бере прогноз.
+6. Залишити `EK3_WIND_P_NSE` і `EK3_WIND_PSCALE` на звичайних для літака значеннях. Скрипт змінює їх лише в
+   оперативній пам'яті і лише поки утримує вітер.
 
-All the SITL results below were obtained with an airspeed sensor fused (`ARSPD_USE` 1); without one this has not
-been tried.
+Усі результати SITL нижче отримано з датчиком повітряної швидкості, який використовує EKF (`ARSPD_USE` 1); без
+нього це не перевірялося.
 
-## Before each flight
+## Перед кожним польотом
 
-- Set `SWND_SPD` and `SWND_DIR` to the forecast or measured wind at flight altitude. `SWND_DIR` is the direction
-  the wind blows FROM, degrees true, as in forecasts: 8 m/s from the west is `SWND_SPD` 8, `SWND_DIR` 270.
-  `SWND_SPD` -1 means no forecast; with `SWND_SRC` 0 the script then gives nothing.
+- Встановити `SWND_SPD` і `SWND_DIR` за прогнозом або виміряним вітром на висоті польоту. `SWND_DIR` — напрямок,
+  ЗВІДКИ дме вітер, у градусах істинного курсу, як у прогнозах: 8 м/с із заходу — це `SWND_SPD` 8, `SWND_DIR` 270.
+  `SWND_SPD` -1 означає, що прогнозу немає; тоді з `SWND_SRC` 0 скрипт нічого не задає.
 - `SWND_ENABLE` 1.
 
-## In flight
+## У польоті
 
-Nothing happens while the GPS works. The script waits for steady flight: `SWND_DELAY` s after the start of the
-flight, not in TAKEOFF mode, not on an AUTO `NAV_TAKEOFF`, airspeed above `SWND_AS_MIN`. It then offers the
-wind every 0.5 s, and EKF3 accepts it about 1 s after it stops fusing GPS. Messages:
+Поки GPS працює, нічого не відбувається. Скрипт чекає усталеного польоту: `SWND_DELAY` с від початку польоту, не в
+режимі TAKEOFF, не на команді AUTO `NAV_TAKEOFF`, повітряна швидкість вища за `SWND_AS_MIN`. Тоді він пропонує
+вітер кожні 0,5 с, і EKF3 приймає його приблизно через 1 с після того, як перестає використовувати GPS.
+Повідомлення:
 
-| Message | Meaning |
+| Повідомлення | Значення |
 |---|---|
-| `[SWND] wind set N n E e m/s given (set before flight)` or `(learned from GPS)` | accepted; the wind is held from now on |
-| `[SWND] learned wind N n E e far from forecast, using forecast` | the learned wind is more than `SWND_SRC_TOL` from the forecast |
-| `[SWND] wind re-sent N n E e m/s given (...)` | you changed `SWND_SPD` or `SWND_DIR` while dead reckoning; the new wind was given |
-| `[SWND] GPS back, wind params restored` | GPS in use again for 5 s; `EK3_WIND_P_NSE`, `EK3_WIND_PSCALE` restored, ready for the next loss |
-| `[SWND] disarmed, ...` / `[SWND] disabled, ...` | restored on disarm, or on `SWND_ENABLE` 0 |
+| `[SWND] wind set N n E e m/s given (set before flight)` або `(learned from GPS)` | вітер прийнято; відтепер він утримується |
+| `[SWND] learned wind N n E e far from forecast, using forecast` | вивчений вітер відрізняється від прогнозу більше ніж на `SWND_SRC_TOL` |
+| `[SWND] wind re-sent N n E e m/s given (...)` | ви змінили `SWND_SPD` або `SWND_DIR` під час рахунку шляху; новий вітер задано |
+| `[SWND] GPS back, wind params restored` | GPS знову використовується 5 с; `EK3_WIND_P_NSE`, `EK3_WIND_PSCALE` відновлено, скрипт готовий до наступної втрати |
+| `[SWND] disarmed, ...` / `[SWND] disabled, ...` | відновлено при роззброєнні (disarm) або при `SWND_ENABLE` 0 |
 
-- **Operator update:** during the outage, a better wind estimate can be sent by changing `SWND_SPD` and
-  `SWND_DIR` (both in the FROM convention). The new wind is re-sent at once and replaces the held one. It does not
-  undo the position error built up so far.
-- **Stop holding:** set `SWND_ENABLE` 0. The EKF parameters are restored and the EKF learns the wind from airspeed
-  again.
+- **Оновлення від оператора:** під час втрати GPS можна передати кращу оцінку вітру, змінивши `SWND_SPD` і
+  `SWND_DIR` (обидва — ЗВІДКИ дме). Новий вітер одразу задається замість утримуваного. Похибку позиції, що вже
+  накопичилася, це не прибирає.
+- **Припинити утримання:** встановити `SWND_ENABLE` 0. Параметри EKF відновлюються, і EKF знову вчить вітер за
+  повітряною швидкістю.
 
-## After the flight: the log
+## Після польоту: лог
 
-- `SWND`: Ev 1 accepted, 2 re-sent, 3 GPS back, 4 disarmed, 5 disabled; WN, WE (m/s, the direction the air
-  moves TO), Sig, Src (0 set before flight, 1 learned).
-- `RSW3` (only with `LOG_REPLAY` 1): the wind EKF3 accepted, WN, WE, Sigma.
-- `XKF2` VWN, VWE: the EKF wind per core. It steps to the given wind at the `SWND` Ev 1 time.
-- `XKF1` PN, PE: the EKF position. In SITL, compare it with the true position in `SIM2`.
+- `SWND`: Ev 1 прийнято, 2 задано повторно, 3 GPS повернувся, 4 роззброєння, 5 вимкнено; WN, WE (м/с, напрямок,
+  КУДИ рухається повітря), Sig, Src (0 задано перед польотом, 1 вивчено).
+- `RSW3` (лише з `LOG_REPLAY` 1): вітер, який прийняв EKF3, WN, WE, Sigma.
+- `XKF2` VWN, VWE: вітер EKF для кожного ядра. У момент `SWND` Ev 1 він стрибком переходить на заданий вітер.
+- `XKF1` PN, PE: позиція EKF. У SITL порівнювати її з істинною позицією в `SIM2`.
 
 ## Replay
 
-Build once: `./waf configure --board sitl` and `./waf replay`, giving `build/sitl/tool/Replay`. Replay writes
-`logs/00000001.BIN` into the current directory, so run it in an empty one. The replayed EKF cores are logged with
-`C` 100 and 101, next to the flown `C` 0 and 1.
+Зібрати один раз: `./waf configure --board sitl` і `./waf replay`, отримаємо `build/sitl/tool/Replay`. Replay пише
+`logs/00000001.BIN` у поточний каталог, тому запускати його в порожньому. Відтворені ядра EKF пишуться з `C` 100 і
+101, поруч із ядрами польоту `C` 0 і 1.
 
-- `Replay flight.BIN`: replays the EKF with the logged `RSW3`. Check that `XKF2` `C`100 matches `C`0.
-- `Replay --set-wind=T,N,E,SIGMA flight.BIN`: from log time T (seconds since boot, as `TimeUS`), offers wind N,
-  E (m/s, TO convention) with SIGMA every frame until EKF3 accepts it, then prints `set-wind accepted at ... s`.
-  Use it to try a forecast on a flight that was flown without one, for example `--set-wind=1975,0,8,0.5`. A
-  logged `RSW3` is applied as well, so for a clean comparison use a log flown without the script.
+- `Replay flight.BIN`: відтворює EKF із записаним `RSW3`. Перевірити, що `XKF2` `C`100 збігається з `C`0.
+- `Replay --set-wind=T,N,E,SIGMA flight.BIN`: починаючи з часу лога T (секунди від завантаження, як `TimeUS`),
+  пропонує вітер N, E (м/с, КУДИ рухається повітря) із SIGMA на кожному кадрі, доки EKF3 його не прийме, і тоді
+  виводить `set-wind accepted at ... s`. Так можна перевірити прогноз на польоті, який виконано без нього,
+  наприклад `--set-wind=1975,0,8,0.5`. Записаний `RSW3` теж застосовується, тому для чистого порівняння брати лог
+  польоту без скрипта.
 
-Checked on a SITL log (2026-11-20): plain Replay reproduced the flown wind step at the same 88.0 s
-(VWE 7.88 → 8.05 m/s), and `--set-wind=150,0,4,0.5` was accepted at 150.005 s, with `C`100 VWE going from 8.24
-to 4.00 m/s.
+Перевірено на лозі SITL (2026-11-20): звичайний Replay відтворив стрибок вітру польоту в ту саму мить 88,0 с
+(VWE 7,88 → 8,05 м/с), а `--set-wind=150,0,4,0.5` прийнято на 150,005 с, і VWE для `C`100 змінився з 8,24 на
+4,00 м/с.
 
-## Calling `ahrs:set_wind` from another script
+## Виклик `ahrs:set_wind` з іншого скрипта
 
-`ahrs:set_wind(north, east, sigma)` returns true if at least one EKF3 core accepted the wind. Rules:
+`ahrs:set_wind(north, east, sigma)` повертає true, якщо хоча б одне ядро EKF3 прийняло вітер. Правила:
 
-- North and east are the direction the air moves TO, in m/s. From a forecast: `north = -spd * cos(dir)`,
+- North і east — напрямок, КУДИ рухається повітря, у м/с. З прогнозу: `north = -spd * cos(dir)`,
   `east = -spd * sin(dir)`.
-- It returns false and changes nothing unless EKF3 is dead reckoning. So call it repeatedly, for example every
-  0.5 s, until it returns true, and only in steady flight, not during a launch.
-- Arguments outside the binding's ranges (north and east -100 to 100, sigma 0.5 to 20) raise a Lua error that
-  stops the calling script. Clamp them, or call it through `pcall(ahrs.set_wind, ahrs, n, e, s)`.
-- On acceptance the EKF ground velocity changes by the same amount as the wind (in SITL, 8 m/s east for a
-  wind change of 8 m/s east). Position does not jump.
-- The airspeed fusion keeps adjusting the wind. To hold it, set `EK3_WIND_P_NSE` 0.01 and `EK3_WIND_PSCALE` 0
-  while dead reckoning and restore them when GPS returns, as this applet does.
+- Якщо EKF3 не веде рахунок шляху, повертає false і нічого не змінює. Тому викликати повторно, наприклад кожні
+  0,5 с, доки не поверне true, і лише в усталеному польоті, не під час запуску.
+- Аргументи поза діапазонами прив'язки (north і east від -100 до 100, sigma від 0,5 до 20) викликають помилку Lua,
+  яка зупиняє скрипт, що викликав функцію. Обмежувати їх або викликати через
+  `pcall(ahrs.set_wind, ahrs, n, e, s)`.
+- Коли вітер прийнято, шляхова швидкість EKF змінюється на ту саму величину, що й вітер (у SITL — на 8 м/с на схід
+  при зміні вітру на 8 м/с на схід). Позиція не стрибає.
+- EKF постійно підправляє вітер за повітряною швидкістю. Щоб утримати його, встановлювати `EK3_WIND_P_NSE` 0.01 і
+  `EK3_WIND_PSCALE` 0 на час рахунку шляху і відновлювати, коли повернеться GPS, як це робить цей скрипт.
 
-## Tests
+## Тести
 
-Two ArduPlane autotests on this branch, run in the `ardupilot:Plane-4.5.4` image:
+Два автотести ArduPlane у цій гілці, запуск в образі `ardupilot:Plane-4.5.4`:
 `Tools/autotest/autotest.py --no-clean test.Plane.SetWindEKF3 test.Plane.WindOnGPSLoss`.
 
-- `SetWindEKF3` uses `libraries/AP_Scripting/tests/set_wind_test.lua` and checks the binding:
-  - refused on the ground and in flight with GPS;
-  - accepted about 5 s after the GPS is disabled, with wind and ground velocity stepping together;
-  - a Lua error for out-of-range arguments;
-  - refused again once GPS is back.
-- `WindOnGPSLoss` flies this applet in SITL wind of 8 m/s from 270:
-  - wind given at the GPS loss and held (EKF3 wind within 1.5 m/s for 120 s);
-  - EKF within 150 m of the true position;
-  - hold parameters set, then restored when GPS returns;
-  - `RSW3` logged.
+- `SetWindEKF3` використовує `libraries/AP_Scripting/tests/set_wind_test.lua` і перевіряє прив'язку:
+  - відмова на землі й у польоті з GPS;
+  - прийнято приблизно через 5 с після вимкнення GPS, вітер і шляхова швидкість змінюються разом;
+  - помилка Lua для аргументів поза діапазоном;
+  - знову відмова, коли GPS повернувся.
+- `WindOnGPSLoss` пролітає з цим скриптом у SITL при вітрі 8 м/с із 270:
+  - вітер задано при втраті GPS і утримано (вітер EKF3 у межах 1,5 м/с протягом 120 с);
+  - EKF у межах 150 м від істинної позиції;
+  - параметри утримання встановлено, а після повернення GPS відновлено;
+  - `RSW3` записано в лог.
 
-  It passed with a largest error of 29 m. The EKF had already learned 7.9 m/s from 25 s of GPS flight before the
-  loss, so this checks the applet's behaviour, not its benefit; for the benefit see runs A and B below.
+  Тест пройдено з найбільшою похибкою 29 м. До втрати GPS EKF уже вивчив 7,9 м/с за 25 с польоту з GPS, тому тест
+  перевіряє поведінку скрипта, а не його користь; користь показують прогони A і B нижче.
 
-## What it does
+## Що робить скрипт
 
-- Wind source (`SWND_SRC`): 0 = the wind set before flight (`SWND_SPD`, `SWND_DIR`, the direction it blows FROM,
-  as in forecasts); 1 = auto: keep the wind the EKF learned from real GPS in flight (at least `SWND_GPS_S`
-  seconds), unless a forecast is set and the learned wind is more than `SWND_SRC_TOL` from it; otherwise the
-  forecast. A wind set before flight but changed in flight before the GPS loss does not override a learned wind;
-  a change during the hold does.
-- Real GPS: the primary receiver has a 3D fix, more than 5 m/s, and its position (within `SWND_GPS_TOL`) and
-  speed (within 3 m/s) agree with the EKF's, so the EKF is using it. A position typed in on the ground (speed 0)
-  and a spoofed receiver the EKF rejects do not count, either as GPS time or as "GPS back".
-- Steady flight only: flying for `SWND_DELAY` s, not in TAKEOFF mode, not on an AUTO `NAV_TAKEOFF`, airspeed
-  above `SWND_AS_MIN`. A wind given 0.3 s into a catapult launch locked a wrong wind in the Replay of the
-  svitlich flight.
-- Hold (`SWND_HOLD` = 1): after acceptance `EK3_WIND_P_NSE` is set to `SWND_HOLD_NSE` (0.01) and
-  `EK3_WIND_PSCALE` to 0 (RAM only), so the airspeed fusion does not walk the wind away. They hold the wind
-  approximately, not exactly (svitlich Replay: 7.3 to 8.05 m/s east in the first seconds, then steady). Both are
-  restored when real GPS is back for 5 s, on disarm, or when disabled. If scripting restarts during the hold,
-  the script finds the hold values at start and sets 0.1 / 1.0 (this aircraft's values, the firmware defaults).
-- Changing `SWND_SPD` or `SWND_DIR` while dead reckoning re-sends that wind (operator update).
-- Log: message `SWND` (Ev 1 accepted, 2 re-sent, 3 GPS back, 4 disarmed, 5 disabled; WN, WE, Sig, Src) and
-  `[SWND]` text.
+- Джерело вітру (`SWND_SRC`): 0 — вітер, заданий перед польотом (`SWND_SPD`, `SWND_DIR`, напрямок, ЗВІДКИ дме, як у
+  прогнозах); 1 — авто: залишити вітер, який EKF вивчив за справжнім GPS у польоті (щонайменше `SWND_GPS_S`
+  секунд), якщо тільки не задано прогноз і вивчений вітер не відрізняється від нього більше ніж на `SWND_SRC_TOL`;
+  інакше прогноз. Вітер, заданий перед польотом і змінений у польоті до втрати GPS, не замінює вивченого вітру;
+  зміна під час утримання — замінює.
+- Справжній GPS: основний приймач має 3D-фікс, швидкість понад 5 м/с, а його позиція (у межах `SWND_GPS_TOL`) і
+  швидкість (у межах 3 м/с) збігаються з EKF, тобто EKF його використовує. Позиція, введена на землі (швидкість 0),
+  і підмінений (спуфінг) приймач, якого EKF відкидає, не враховуються ні як час з GPS, ні як «GPS повернувся».
+- Лише в усталеному польоті: літак летить `SWND_DELAY` с, не в режимі TAKEOFF, не на команді AUTO `NAV_TAKEOFF`,
+  повітряна швидкість вища за `SWND_AS_MIN`. Вітер, заданий через 0,3 с після запуску з катапульти, зафіксував
+  хибний вітер у Replay польоту svitlich.
+- Утримання (`SWND_HOLD` = 1): після прийняття `EK3_WIND_P_NSE` встановлюється в `SWND_HOLD_NSE` (0.01), а
+  `EK3_WIND_PSCALE` — в 0 (лише в оперативній пам'яті), щоб злиття повітряної швидкості не відводило вітер. Вони
+  утримують вітер приблизно, не точно (Replay svitlich: 7,3–8,05 м/с на схід у перші секунди, далі стабільно). Обидва
+  відновлюються, коли справжній GPS повертається на 5 с, при роззброєнні або при вимкненні. Якщо скриптинг
+  перезапуститься під час утримання, скрипт під час старту знаходить значення утримання і встановлює 0.1 / 1.0
+  (значення цього літака, вони ж стандартні для прошивки).
+- Зміна `SWND_SPD` або `SWND_DIR` під час рахунку шляху задає цей вітер повторно (оновлення від оператора).
+- Лог: повідомлення `SWND` (Ev 1 прийнято, 2 задано повторно, 3 GPS повернувся, 4 роззброєння, 5 вимкнено; WN, WE,
+  Sig, Src) і текст `[SWND]`.
 
-## Parameters (table key 171)
+## Параметри (ключ таблиці 171)
 
-| Name | Default | Meaning |
+| Назва | Стандартно | Значення |
 |---|---|---|
-| SWND_ENABLE | 1 | enable |
-| SWND_SPD | -1 | wind speed set before flight, m/s (negative = none) |
-| SWND_DIR | 0 | direction the wind comes from, deg true |
-| SWND_SIGMA | 0.5 | uncertainty given to the EKF, m/s (0.5 to 20) |
-| SWND_SRC | 1 | 0 set before flight, 1 auto |
-| SWND_GPS_S | 30 | seconds of real GPS in flight to trust the learned wind |
-| SWND_DELAY | 20 | seconds flying before a wind is given |
-| SWND_AS_MIN | 12 | least airspeed, m/s (0 = no check) |
-| SWND_HOLD | 1 | hold the wind while dead reckoning |
-| SWND_HOLD_NSE | 0.01 | EK3_WIND_P_NSE while holding |
-| SWND_GPS_TOL | 100 | m; GPS position must agree with the EKF's to count as real GPS |
-| SWND_SRC_TOL | 3 | m/s; largest learned-vs-forecast difference for the learned wind to be used |
+| SWND_ENABLE | 1 | увімкнено |
+| SWND_SPD | -1 | швидкість вітру, задана перед польотом, м/с (від'ємна — не задано) |
+| SWND_DIR | 0 | напрямок, звідки дме вітер, градуси істинного курсу |
+| SWND_SIGMA | 0.5 | невизначеність, яку отримує EKF, м/с (від 0,5 до 20) |
+| SWND_SRC | 1 | 0 задано перед польотом, 1 авто |
+| SWND_GPS_S | 30 | секунди справжнього GPS у польоті, щоб довіряти вивченому вітру |
+| SWND_DELAY | 20 | секунди польоту до того, як задати вітер |
+| SWND_AS_MIN | 12 | найменша повітряна швидкість, м/с (0 — без перевірки) |
+| SWND_HOLD | 1 | утримувати вітер під час рахунку шляху |
+| SWND_HOLD_NSE | 0.01 | EK3_WIND_P_NSE під час утримання |
+| SWND_GPS_TOL | 100 | м; позиція GPS має збігатися з EKF, щоб вважатися справжнім GPS |
+| SWND_SRC_TOL | 3 | м/с; найбільша різниця між вивченим вітром і прогнозом, за якої береться вивчений |
 
-## SITL results (2026-11-19)
+## Результати SITL (2026-11-19)
 
-ArduPlane SITL, speedup 3, wind from the west (SIM_WIND_SPD 8, SIM_WIND_DIR 270, SIM_WIND_TURB 0; in SITL the
-direction is the one the wind comes FROM), airspeed fused (ARSPD_USE 1). AUTO mission: takeoff, then legs of
-2.5 km on a hexagon (all directions). Error = EKF position (XKF1 core 0 PN/PE) against the SIM2 true position.
-Runs A to C used the first version of the script (commit 3f7b0ac08d); the GPS agreement test, the forecast
-check, the AUTO take-off exclusion and the restart check were added after them and are not run in SITL.
+ArduPlane SITL, прискорення 3, вітер із заходу (SIM_WIND_SPD 8, SIM_WIND_DIR 270, SIM_WIND_TURB 0; у SITL напрямок
+— звідки дме вітер), EKF використовує повітряну швидкість (ARSPD_USE 1). Місія AUTO: зліт, далі відрізки по 2,5 км
+по шестикутнику (усі напрямки). Похибка = позиція EKF (XKF1, ядро 0, PN/PE) проти істинної позиції SIM2. Прогони
+A–C виконано з першою версією скрипта (коміт 3f7b0ac08d); перевірку узгодженості GPS, перевірку прогнозу,
+виключення зльоту в AUTO і перевірку перезапуску додано після них, у SITL їх не проганяли.
 
-Runs A and B: GPS disabled (SIM_GPS_DISABLE 1) at 11.6 m height, flown 651 s after that.
+Прогони A і B: GPS вимкнено (SIM_GPS_DISABLE 1) на висоті 11,6 м, після цього 651 с польоту.
 
-| Time after GPS loss | A no script, error m | A, EKF wind E m/s | B script (SRC 0, 8 m/s from 270), error m | B, EKF wind E m/s |
+| Час після втрати GPS | A без скрипта, похибка, м | A, вітер EKF на схід, м/с | B зі скриптом (SRC 0, 8 м/с із 270), похибка, м | B, вітер EKF на схід, м/с |
 |---|---|---|---|---|
-| 60 s | 282 | 1.5 | 42 | 7.9 |
-| 120 s | 626 | 2.0 | 59 | 8.0 |
-| 300 s | 1653 | 2.1 | 35 | 8.0 |
-| 600 s | 3476 | 2.1 | 36 | 8.05 |
-| end (651 s) | 3769 | 2.1 | 38 | 8.05 |
-| max | 3769 | | 74 (at 106 s) | |
+| 60 с | 282 | 1,5 | 42 | 7,9 |
+| 120 с | 626 | 2,0 | 59 | 8,0 |
+| 300 с | 1653 | 2,1 | 35 | 8,0 |
+| 600 с | 3476 | 2,1 | 36 | 8,05 |
+| кінець (651 с) | 3769 | 2,1 | 38 | 8,05 |
+| максимум | 3769 | | 74 (на 106 с) | |
 
-In B the wind was accepted 16.3 s after the GPS loss (first steady flight after takeoff); the EKF wind jumped
-from 0.8 to 8.0 m/s east and the velocity east by the same 7.2 m/s in one step.
+У B вітер прийнято через 16,3 с після втрати GPS (перший усталений політ після зльоту); вітер EKF стрибком змінився з
+0,8 до 8,0 м/с на схід, а швидкість на схід — на ті самі 7,2 м/с за один крок.
 
-Run C: `SWND_SRC` 1, forecast 8 m/s from 250 (20 deg off), GPS kept for 60 s of flight, then lost. The script
-gave the learned wind (N -0.9, E 6.2: the EKF had not converged to 8 in 60 s); error 50 / 117 / 204 m at
-60 / 120 / 180 s. At 180 s the operator set `SWND_DIR` 270: re-sent N 0, E 8; error 218 / 247 / 272 m at
-240 / 300 / 360 s (the error already built up stays). GPS back at 361 s: after 5 s the parameters returned to
-0.1 / 1.0, error 0.7 m at 480 s. Disarm restore and a second outage were not run.
+Прогін C: `SWND_SRC` 1, прогноз 8 м/с із 250 (на 20° відхилено), GPS був 60 с польоту, потім втрачений. Скрипт задав
+вивчений вітер (N -0,9, E 6,2: за 60 с EKF не зійшовся до 8); похибка 50 / 117 / 204 м на 60 / 120 / 180 с. На
+180 с оператор встановив `SWND_DIR` 270: задано повторно N 0, E 8; похибка 218 / 247 / 272 м на 240 / 300 / 360 с
+(накопичена похибка залишається). GPS повернувся на 361 с: через 5 с параметри повернулися до 0.1 / 1.0, похибка
+0,7 м на 480 с. Відновлення при роззброєнні і другу втрату GPS не проганяли.
