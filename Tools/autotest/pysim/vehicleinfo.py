@@ -352,6 +352,32 @@ class VehicleInfo(object):
                 "default_params_filename": "default_params/plane-jsbsim.parm",
                 "external": True,
             },
+            # 10-кг легший/менший канард, відкалібрований із real/100/00000002.BIN.
+            "jsbsim-canard10": {
+                "waf_target": "bin/arduplane",
+                "model": "jsbsim:canard10",
+                "default_params_filename": "default_params/plane-jsbsim.parm",
+                "external": True,
+            },
+            "jsbsim-canard10-air": {
+                "waf_target": "bin/arduplane",
+                "model": "jsbsim:canard10:air",
+                "default_params_filename": "default_params/plane-jsbsim.parm",
+                "external": True,
+            },
+            # 100-кг борт (400), відкалібрований із real/400/00000022.BIN.
+            "jsbsim-plane400": {
+                "waf_target": "bin/arduplane",
+                "model": "jsbsim:plane400",
+                "default_params_filename": "default_params/plane-jsbsim.parm",
+                "external": True,
+            },
+            "jsbsim-plane400-air": {
+                "waf_target": "bin/arduplane",
+                "model": "jsbsim:plane400:air",
+                "default_params_filename": "default_params/plane-jsbsim.parm",
+                "external": True,
+            },
             "plane-ice": {
                 "waf_target": "bin/arduplane",
                 "default_params_filename": ["models/plane.parm", "default_params/plane-ice.parm"],
