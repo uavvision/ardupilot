@@ -4,6 +4,7 @@
 
 #include <AP_Common/AP_Common.h>
 #include <AP_Gripper/AP_Gripper.h>
+#include "KAM_Targeting.h"
 
 // Global parameter class.
 //
@@ -590,6 +591,8 @@ public:
     AP_Int32        oneshot_mask;
     
     AP_Int8         axis_bitmask; // axes to be autotuned
+
+    KAM_Targeting   kam_targeting;
 
     // just to make compilation easier when all things are compiled out...
     uint8_t unused_integer;

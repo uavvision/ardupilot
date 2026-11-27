@@ -56,6 +56,7 @@ overruns its allotted time
 const AP_Scheduler::Task Plane::scheduler_tasks[] = {
                            // Units:   Hz      us
     FAST_TASK(ahrs_update),
+    FAST_TASK_CLASS(KAM_Targeting, &plane.g2.kam_targeting, update_gyro_yaw),
     FAST_TASK(update_control_mode),
     FAST_TASK(stabilize),
     FAST_TASK(set_servos),
@@ -144,6 +145,7 @@ const AP_Scheduler::Task Plane::scheduler_tasks[] = {
 #if AC_PRECLAND_ENABLED
     SCHED_TASK(precland_update, 400, 50, 160),
 #endif
+    SCHED_TASK_CLASS(KAM_Targeting, &plane.g2.kam_targeting, update, 50, 400, 161),
 };
 
 void Plane::get_scheduler_tasks(const AP_Scheduler::Task *&tasks,

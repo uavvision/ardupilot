@@ -1275,6 +1275,10 @@ const AP_Param::GroupInfo ParametersG2::var_info[] = {
     AP_SUBGROUPINFO(precland, "PLND_", 35, ParametersG2, AC_PrecLand),
 #endif
 
+    // @Group: KAM_
+    // @Path: KAM_Targeting.cpp
+    AP_SUBGROUPINFO(kam_targeting, "KAM_", 60, ParametersG2, KAM_Targeting),
+
     AP_GROUPEND
 };
 

@@ -756,6 +756,7 @@ void GCS_MAVLINK_Plane::handle_landing_target(const mavlink_landing_target_t &pa
 #if AC_PRECLAND_ENABLED
     plane.g2.precland.handle_msg(packet, timestamp_ms);
 #endif
+    plane.g2.kam_targeting.handle_landing_target(packet);
 }
 
 MAV_RESULT GCS_MAVLINK_Plane::handle_command_preflight_calibration(const mavlink_command_int_t &packet, const mavlink_message_t &msg)

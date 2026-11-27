@@ -140,6 +140,7 @@ public:
     friend class GCS_Plane;
     friend class RC_Channel_Plane;
     friend class RC_Channels_Plane;
+    friend class KAM_Targeting;
     friend class Tailsitter;
     friend class Tiltrotor;
     friend class SLT_Transition;
