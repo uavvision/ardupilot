@@ -27,6 +27,8 @@
 #if HAL_SIM_JSBSIM_ENABLED
 
 #include <string>
+#include <vector>
+#include <time.h>
 
 #include <AP_HAL/utility/Socket_native.h>
 
@@ -100,6 +102,20 @@ private:
 
     // вимикає контакт з землею після відриву (див. .cpp)
     void disable_ground_after_takeoff(void);
+
+    // Багатошаровий профіль вітру за висотою AGL (файл wind_profile.txt або SIM_WIND_PROFILE)
+    struct WindLayer {
+        float alt_m;
+        float wn_ms;
+        float we_ms;
+    };
+    std::vector<WindLayer> wind_layers;
+    std::string wind_profile_path;
+    bool wind_profile_disabled = false;
+    time_t wind_profile_mtime = 0;
+    uint32_t wind_profile_check_cnt = 0;
+    void load_wind_profile(bool force = false);
+    bool eval_wind_profile(float alt_m, float &speed_ms, float &psiw_rad) const;
 };
 
 /*

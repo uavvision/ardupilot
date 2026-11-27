@@ -20,10 +20,12 @@
 
 #if HAL_SIM_JSBSIM_ENABLED
 
+#include <algorithm>
 #include <arpa/inet.h>
 #include <errno.h>
 #include <fcntl.h>
 #include <stdio.h>
+#include <stdlib.h>
 #include <string>
 #include <sys/stat.h>
 #include <sys/types.h>
@@ -474,6 +476,111 @@ bool JSBSim::open_fdm_socket(void)
 
 
 /*
+  Багатошаровий профіль вітру за висотою AGL.
+  Формат файлу (рядки з # і порожні ігноруються):
+      alt_m   speed_ms   from_deg
+  Шлях береться зі змінної середовища SIM_WIND_PROFILE (значення "", "0",
+  "off", "none" вимикають профіль) або типово "wind_profile.txt" у робочій
+  теці SITL. При зміні mtime файл перечитується на льоту.
+*/
+void JSBSim::load_wind_profile(bool force)
+{
+    if (wind_profile_disabled) {
+        return;
+    }
+    if (wind_profile_path.empty()) {
+        const char *env = getenv("SIM_WIND_PROFILE");
+        if (env != nullptr) {
+            if (env[0] == '\0' || strcmp(env, "0") == 0 ||
+                strcmp(env, "off") == 0 || strcmp(env, "none") == 0) {
+                wind_profile_disabled = true;
+                wind_layers.clear();
+                return;
+            }
+            wind_profile_path = env;
+        } else {
+            wind_profile_path = "wind_profile.txt";
+        }
+    }
+
+    struct stat st {};
+    if (stat(wind_profile_path.c_str(), &st) != 0) {
+        if (!wind_layers.empty()) {
+            fprintf(stderr, "JSBSim wind profile removed: %s\n", wind_profile_path.c_str());
+            wind_layers.clear();
+            wind_profile_mtime = 0;
+        }
+        return;
+    }
+    if (!force && st.st_mtime == wind_profile_mtime && !wind_layers.empty()) {
+        return;
+    }
+
+    FILE *f = fopen(wind_profile_path.c_str(), "r");
+    if (f == nullptr) {
+        return;
+    }
+    std::vector<WindLayer> parsed;
+    char line[256];
+    while (fgets(line, sizeof(line), f) != nullptr) {
+        char *p = line;
+        while (*p == ' ' || *p == '\t') {
+            p++;
+        }
+        if (*p == '\0' || *p == '\n' || *p == '\r' || *p == '#') {
+            continue;
+        }
+        float alt_m = 0.0f, spd_ms = 0.0f, from_deg = 0.0f;
+        if (sscanf(p, "%f %f %f", &alt_m, &spd_ms, &from_deg) == 3) {
+            // from_deg — метеорологічний напрямок (звідки дме), JSBSim psiw — куди дме (NED)
+            const float to_rad = radians(from_deg + 180.0f);
+            parsed.push_back(WindLayer{alt_m, spd_ms * cosf(to_rad), spd_ms * sinf(to_rad)});
+        }
+    }
+    fclose(f);
+
+    std::sort(parsed.begin(), parsed.end(),
+              [](const WindLayer &a, const WindLayer &b) { return a.alt_m < b.alt_m; });
+    wind_layers = std::move(parsed);
+    wind_profile_mtime = st.st_mtime;
+    fprintf(stderr, "JSBSim wind profile loaded: %s (%zu layers)\n",
+            wind_profile_path.c_str(), wind_layers.size());
+}
+
+bool JSBSim::eval_wind_profile(float alt_m, float &speed_ms, float &psiw_rad) const
+{
+    if (wind_layers.empty()) {
+        return false;
+    }
+    float wn = 0.0f, we = 0.0f;
+    if (alt_m <= wind_layers.front().alt_m) {
+        wn = wind_layers.front().wn_ms;
+        we = wind_layers.front().we_ms;
+    } else if (alt_m >= wind_layers.back().alt_m) {
+        wn = wind_layers.back().wn_ms;
+        we = wind_layers.back().we_ms;
+    } else {
+        for (size_t i = 1; i < wind_layers.size(); i++) {
+            if (alt_m <= wind_layers[i].alt_m) {
+                const WindLayer &a = wind_layers[i - 1];
+                const WindLayer &b = wind_layers[i];
+                const float dh = b.alt_m - a.alt_m;
+                const float u = (dh > 1e-4f) ? (alt_m - a.alt_m) / dh : 0.0f;
+                wn = a.wn_ms + u * (b.wn_ms - a.wn_ms);
+                we = a.we_ms + u * (b.we_ms - a.we_ms);
+                break;
+            }
+        }
+    }
+    speed_ms = hypotf(wn, we);
+    psiw_rad = atan2f(we, wn);
+    if (psiw_rad < 0.0f) {
+        psiw_rad += M_2PI;
+    }
+    return true;
+}
+
+/*
   decode and send servos
 */
 void JSBSim::send_servos(const struct sitl_input &input)
@@ -498,7 +605,23 @@ void JSBSim::send_servos(const struct sitl_input &input)
         elevator = (ch2-ch1)/2.0f;
         rudder   = (ch2+ch1)/2.0f;
     }
+    if ((wind_profile_check_cnt++ % 400U) == 0U) {
+        load_wind_profile(false);
+    }
     float wind_speed_fps = input.wind.speed / FEET_TO_METERS;
+    float wind_psiw_rad = radians(input.wind.direction);
+    float prof_spd_ms = 0.0f, prof_psiw_rad = 0.0f;
+    if (eval_wind_profile(hagl(), prof_spd_ms, prof_psiw_rad)) {
+        if (!ground_disabled) {
+            // Захист від перевертання на ЗПС лише до першого відриву;
+            // після відриву профіль діє на будь-якій висоті, вкл. < 0 м у ямі.
+            wind_speed_fps = 0.0f;
+            wind_psiw_rad = prof_psiw_rad;
+        } else {
+            wind_speed_fps = prof_spd_ms / FEET_TO_METERS;
+            wind_psiw_rad = prof_psiw_rad;
+        }
+    }
 
     /*
       Турбулентність JSBSim (atmosphere/turb-type 4 = Tustin/Dryden за
@@ -528,7 +651,7 @@ void JSBSim::send_servos(const struct sitl_input &input)
              "set atmosphere/turbulence/milspec/severity %f\n"
              "iterate 1\n",
              aileron, elevator, rudder, throttle,
-             radians(input.wind.direction),
+             wind_psiw_rad,
              wind_speed_fps,
              turb_speed_fps,
              input.wind.turbulence);
